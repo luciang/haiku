@@ -12,6 +12,16 @@
 #include <linux/types.h>
 
 extern int dprintf(const char *, ...);
+extern char * strdup(const char * str);
+extern void * malloc(int len);
+
+extern int wrap_lkl_env_init(int memsize);
+extern void wrap_lkl_env_fini(void);
+extern int cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie);
+extern int cookie_lklfs_scan_partition(void *_cookie, __s64 * p_content_size, __u32 * p_block_size,
+								char ** p_content_name);
+extern void cookie_lklfs_free_cookie(void *_cookie);
+
 int wrap_lkl_env_init(int memsize)
 {
 	return lkl_env_init(memsize);
@@ -26,11 +36,12 @@ void wrap_lkl_env_fini(void)
  * return 0 - in case of error
  * return a non-0 dev_t on success
  */
-__kernel_dev_t mount_disk(int fd, unsigned long size, char *mntpath, unsigned long mntpath_size)
+static __kernel_dev_t mount_disk(int fd, unsigned long size,
+	char *mntpath, unsigned long mntpath_size)
 {
         int rc;
 	__kernel_dev_t dev;
-        dev = lkl_disk_add_disk(fd, size);
+	dev = lkl_disk_add_disk((void*) fd, size);
 	dprintf( "mount_disk:: dev=%d\n", (int) dev);
 	if (dev == 0)
 		return 0;
@@ -44,7 +55,7 @@ __kernel_dev_t mount_disk(int fd, unsigned long size, char *mntpath, unsigned lo
 	return dev;
 }
 
-int umount_disk(__kernel_dev_t dev)
+static int umount_disk(__kernel_dev_t dev)
 {
 	int rc;
 	rc = lkl_umount_dev(dev, 0);
@@ -58,7 +69,7 @@ int umount_disk(__kernel_dev_t dev)
 	return rc;
 }
 
-void list_files(const char * path)
+static void list_files(const char * path)
 {
 	int fd;
 	dprintf("[list_files] -------- printing contents of [%s]\n", path);
@@ -83,16 +94,57 @@ void list_files(const char * path)
 	dprintf("[list_files] ++++++++ done printing contents of [%s]\n", path);
 }
 
-int wrap_lkl_identify_partition(int fd, unsigned int size)
+
+struct lklfs_partition_id {
+	__kernel_dev_t dev; // the Linux identifier for the device block
+	char mnt_str[25]; // this will be a string like "/dev/xxxxxxxxxxxxxxxx"
+};
+
+int cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie)
 {
-	__kernel_dev_t dev;
-	char mnt_str[]= { "/dev/xxxxxxxxxxxxxxxx" };
-	dev = mount_disk(fd, size, mnt_str, sizeof(mnt_str));
-	if (dev == 0)
+	struct lklfs_partition_id *part = malloc(sizeof(struct lklfs_partition_id));
+	if (part == NULL)
 		return -1;
-	dprintf("wrap_lkl_identify_partition:: mnt_str=%s\n", mnt_str);
-	list_files(mnt_str);
+
+	snprintf(part->mnt_str, sizeof(part->mnt_str), "/dev/xxxxxxxxxxxxxxxx");
+	part->dev = mount_disk(fd, size, part->mnt_str, sizeof(part->mnt_str));
+	if (part->dev == 0) {
+		free(part);
+		return -1;
+	}
+
+	// debug:
+	dprintf("wrap_lkl_identify_partition:: mnt_str=%s\n", part->mnt_str);
+	list_files(part->mnt_str);
 	list_files("."); // should be equal to '/'
-	umount_disk(dev);
+
+	*_cookie = part;
 	return 0;
 }
+
+int cookie_lklfs_scan_partition(void *_cookie, __s64 * p_content_size, __u32 * p_block_size,
+								char ** p_content_name)
+{
+	struct __kernel_statfs stat;
+	struct lklfs_partition_id * part = (struct lklfs_partition_id *) _cookie;
+	int rc;
+	rc = lkl_sys_statfs(part->mnt_str, &stat);
+	dprintf("[[cookie_lklfs_scan_partition]]: lkl_sys_statfs rc=%d\n", rc);
+	if (rc < 0)
+		return -1;
+	*p_content_size = stat.f_blocks * stat.f_bsize;
+	*p_block_size = stat.f_bsize;
+	*p_content_name = strdup("mumu");
+	if (*p_content_name == NULL)
+		return -1;
+
+	return 0;
+}
+
+void cookie_lklfs_free_cookie(void *_cookie)
+{
+	struct lklfs_partition_id * part = (struct lklfs_partition_id *) _cookie;
+	umount_disk(part->dev);
+	free(part);
+}
+

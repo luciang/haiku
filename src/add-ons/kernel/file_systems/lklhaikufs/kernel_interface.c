@@ -13,8 +13,10 @@
 
 extern int wrap_lkl_env_init(int memsize);
 extern void wrap_lkl_env_fini(void);
-extern int wrap_lkl_identify_partition(int fd, unsigned int size);
-
+extern int cookie_lklfs_identify_partition(int fd, off_t size, void ** _cookie);
+extern int cookie_lklfs_scan_partition(void *_cookie, off_t * p_content_size, uint32 * p_block_size,
+									   char ** p_content_name);
+extern void cookie_lklfs_free_cookie(void *_cookie);
 
 static status_t
 lklfs_std_ops(int32 op, ...)
@@ -41,23 +43,36 @@ static float
 lklfs_identify_partition(int fd, partition_data* partition, void** _cookie)
 {
 	int rc;
-	rc = wrap_lkl_identify_partition(fd, partition->size);
+	rc = cookie_lklfs_identify_partition(fd, partition->size, _cookie);
 	if (rc != 0)
 		return -1;
-	return 0.8f;
+
+	/* most Haiku file systems return 0.8f. We give priority to native
+	   file system drivers returning something less than 0.8f */
+	return 0.6f;
 }
 
 
 static status_t
-lklfs_scan_partition(int fd, partition_data* partition, void* _cookie)
+lklfs_scan_partition(int fd, partition_data* p, void* _cookie)
 {
+	int rc;
+	rc = cookie_lklfs_scan_partition(_cookie, &p->content_size,
+		 &p->block_size, &p->content_name);
+	if (rc == -1)
+		return B_ERROR;
+	if (p->content_name == NULL)
+		return B_NO_MEMORY;
+	p->status = B_PARTITION_VALID;
+	p->flags |= B_PARTITION_FILE_SYSTEM;
 	dprintf("[lklfs] lklfs_scan_partition\n");
-	return B_NO_MEMORY;
+	return B_OK;
 }
 
 static void
 lklfs_free_identify_partition_cookie(partition_data* partition, void* _cookie)
 {
+	cookie_lklfs_free_cookie(_cookie);
 	dprintf("[lklfs] lklfs_free_identify_partition_cookie\n");
 }
 static status_t
