@@ -10,7 +10,9 @@
 #include <asm/disk.h>
 #include <asm/env.h>
 #include <linux/types.h>
+#include <linux/fs.h>
 
+extern void* memcpy(void*dst, const void*src, int size);
 extern int dprintf(const char *, ...);
 extern char * strdup(const char * str);
 extern void * malloc(int len);
@@ -20,56 +22,72 @@ extern void wrap_lkl_env_fini(void);
 extern int cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie);
 extern int cookie_lklfs_scan_partition(void *_cookie, __s64 * p_content_size, __u32 * p_block_size,
 								char ** p_content_name);
-extern void cookie_lklfs_free_cookie(void *_cookie);
 
-int wrap_lkl_env_init(int memsize)
+typedef struct lklfs_partition_id {
+	__s64 content_size;
+	__u32 block_size;
+	char * content_name;
+} lklfs_partition_id;
+
+
+int
+wrap_lkl_env_init(int memsize)
 {
 	return lkl_env_init(memsize);
 }
 
-void wrap_lkl_env_fini(void)
+void
+wrap_lkl_env_fini(void)
 {
 	lkl_env_fini();
 }
 
-/* 
+/*
  * return 0 - in case of error
  * return a non-0 dev_t on success
  */
-static __kernel_dev_t mount_disk(int fd, unsigned long size,
+static __kernel_dev_t
+mount_disk(int fd, unsigned long size, unsigned long flags,
 	char *mntpath, unsigned long mntpath_size)
 {
-        int rc;
+	int rc;
 	__kernel_dev_t dev;
 	dev = lkl_disk_add_disk((void*) fd, size);
-	dprintf( "mount_disk:: dev=%d\n", (int) dev);
+	dprintf("mount_disk> dev=%d\n", (int) dev);
 	if (dev == 0)
 		return 0;
-        rc = lkl_mount_dev(dev, NULL, 0, NULL, mntpath, mntpath_size);
-	if (rc) {
-                dprintf( "mount_disk> lkl_mount_dev rc=%d\n", rc);
+
+
+	rc = lkl_mount_dev(dev, NULL, flags, NULL, mntpath, mntpath_size);
+	if (rc != 0) {
+		dprintf("mount_disk> lkl_mount_dev rc=%d\n", rc);
 		lkl_disk_del_disk(dev);
 		return 0;
 	}
-	dprintf( "mount_disk> success\n");
+
+	dprintf("mount_disk> success\n");
 	return dev;
 }
 
-static int umount_disk(__kernel_dev_t dev)
+
+static int
+umount_disk(__kernel_dev_t dev)
 {
 	int rc;
 	rc = lkl_umount_dev(dev, 0);
-	if (rc)
+	if (rc != 0)
 		dprintf( "umount_disk> lkl_umount_dev rc=%d\n", rc);
 	rc = lkl_disk_del_disk(dev);
-        if (rc)
+	if (rc != 0)
 		dprintf( "umount_disk> lkl_disk_del_disk rc=%d\n", rc);
 
 	dprintf( "umount_disk> exiting\n");
 	return rc;
 }
 
-static void list_files(const char * path)
+
+static void
+list_files(const char * path)
 {
 	int fd;
 	dprintf("[list_files] -------- printing contents of [%s]\n", path);
@@ -95,56 +113,64 @@ static void list_files(const char * path)
 }
 
 
-struct lklfs_partition_id {
-	__kernel_dev_t dev; // the Linux identifier for the device block
-	char mnt_str[25]; // this will be a string like "/dev/xxxxxxxxxxxxxxxx"
-};
 
-int cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie)
+static int
+fill_partition_id(const char * mnt_path, lklfs_partition_id * part)
 {
-	struct lklfs_partition_id *part = malloc(sizeof(struct lklfs_partition_id));
-	if (part == NULL)
+	struct __kernel_statfs stat;
+	int rc;
+	rc = lkl_sys_statfs(mnt_path, &stat);
+	dprintf("[[cookie_lklfs_scan_partition]]: lkl_sys_statfs(%s) rc=%d\n", mnt_path, rc);
+	if (rc < 0)
 		return -1;
 
-	snprintf(part->mnt_str, sizeof(part->mnt_str), "/dev/xxxxxxxxxxxxxxxx");
-	part->dev = mount_disk(fd, size, part->mnt_str, sizeof(part->mnt_str));
-	if (part->dev == 0) {
-		free(part);
+	part->content_size = stat.f_blocks * stat.f_bsize;
+	part->block_size = stat.f_bsize;
+	part->content_name = strdup("FIXME: LKL: label retrieval not implemented ");
+	if (part->content_name == NULL)
+		return -1;
+
+	return 0;
+}
+
+
+int
+cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie)
+{
+	int rc = 0;
+	__kernel_dev_t dev;
+	char mnt_str[] = { "/mnt/xxxxxxxxxxxxxxxx" };
+	struct lklfs_partition_id part;
+
+
+	// we only want some info about the partition, mount it read-only.
+	dev = mount_disk(fd, size, MS_RDONLY, mnt_str, sizeof(mnt_str));
+	if (dev == 0)
+		return -1;
+
+	// debug
+	dprintf("wrap_lkl_identify_partition:: mnt_str=%s\n", mnt_str);
+	list_files(mnt_str);
+	list_files("."); // should be equal to '/'
+
+	// save some information for later (for lklfs_scan_partition)
+	rc = fill_partition_id(mnt_str, &part);
+	if (rc != 0)
+		dprintf("wrap_lkl_identify_partition: fill_partition_id returned rc=%d\n", rc);
+
+	// umount the partition as we've gathered all needed info and this
+	// fd won't be valid in other fs calls (e.g. scan_partition) anyway.
+	rc |= umount_disk(dev);
+	if (rc != 0) {
+		dprintf("wrap_lkl_identify_partition: umount_disk failed rc=%d\n", rc);
 		return -1;
 	}
 
-	// debug:
-	dprintf("wrap_lkl_identify_partition:: mnt_str=%s\n", part->mnt_str);
-	list_files(part->mnt_str);
-	list_files("."); // should be equal to '/'
-
-	*_cookie = part;
-	return 0;
-}
-
-int cookie_lklfs_scan_partition(void *_cookie, __s64 * p_content_size, __u32 * p_block_size,
-								char ** p_content_name)
-{
-	struct __kernel_statfs stat;
-	struct lklfs_partition_id * part = (struct lklfs_partition_id *) _cookie;
-	int rc;
-	rc = lkl_sys_statfs(part->mnt_str, &stat);
-	dprintf("[[cookie_lklfs_scan_partition]]: lkl_sys_statfs rc=%d\n", rc);
-	if (rc < 0)
+	*_cookie = malloc(sizeof(struct lklfs_partition_id));
+	if (*_cookie == NULL)
 		return -1;
-	*p_content_size = stat.f_blocks * stat.f_bsize;
-	*p_block_size = stat.f_bsize;
-	*p_content_name = strdup("mumu");
-	if (*p_content_name == NULL)
-		return -1;
+	memcpy(*_cookie, &part, sizeof(part));
 
 	return 0;
-}
-
-void cookie_lklfs_free_cookie(void *_cookie)
-{
-	struct lklfs_partition_id * part = (struct lklfs_partition_id *) _cookie;
-	umount_disk(part->dev);
-	free(part);
 }
 

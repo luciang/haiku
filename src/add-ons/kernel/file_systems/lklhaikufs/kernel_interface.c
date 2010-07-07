@@ -18,6 +18,12 @@ extern int cookie_lklfs_scan_partition(void *_cookie, off_t * p_content_size, ui
 									   char ** p_content_name);
 extern void cookie_lklfs_free_cookie(void *_cookie);
 
+typedef struct lklfs_partition_id {
+	off_t content_size;
+	uint32 block_size;
+	char * content_name;
+} lklfs_partition_id;
+
 
 
 static status_t
@@ -33,7 +39,7 @@ lklfs_std_ops(int32 op, ...)
 			dprintf("[lklfs] std ops UNinit -- kernel shut down\n");
 			return B_OK;
 		default:
-			dprintf("[lklfs] STD_OPS default!\n");
+			dprintf("[lklfs] STD_OPS default -- unknown command!\n");
 			return B_ERROR;
 	}
 }
@@ -41,7 +47,7 @@ lklfs_std_ops(int32 op, ...)
 
 /*
  * Check whether LKL can mount this file system.
- * 
+ *
  * @_cookie will hold a pointer to a structure defined by this driver
  * to identify the file system and will be passed to other functions.
  */
@@ -67,16 +73,15 @@ lklfs_identify_partition(int fd, partition_data* partition, void** _cookie)
 static status_t
 lklfs_scan_partition(int fd, partition_data* p, void* _cookie)
 {
-	int rc;
-	rc = cookie_lklfs_scan_partition(_cookie, &p->content_size,
-		 &p->block_size, &p->content_name);
-	if (rc == -1)
-		return B_ERROR;
-	if (p->content_name == NULL)
+	lklfs_partition_id * part = (lklfs_partition_id*) _cookie;
+	if (part == NULL || part->content_name == NULL)
 		return B_NO_MEMORY;
 
-	p->status = B_PARTITION_VALID;
-	p->flags |= B_PARTITION_FILE_SYSTEM;
+	p->status		 = B_PARTITION_VALID;
+	p->flags		|= B_PARTITION_FILE_SYSTEM;
+	p->content_size	 = part->content_size;;
+	p->block_size	 = part->block_size;
+	p->content_name	 = part->content_name;
 
 	dprintf("lklfs_scan_partition: ret OK\n");
 	return B_OK;
@@ -89,7 +94,7 @@ lklfs_scan_partition(int fd, partition_data* p, void* _cookie)
 static void
 lklfs_free_identify_partition_cookie(partition_data* partition, void* _cookie)
 {
-	cookie_lklfs_free_cookie(_cookie);
+	free(_cookie);
 	dprintf("lklfs_free_identify_partition_cookie: ret\n");
 }
 
