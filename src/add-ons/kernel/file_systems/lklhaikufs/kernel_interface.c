@@ -7,6 +7,8 @@
  */
 
 #include <drivers/fs_interface.h>
+#include <fs_volume.h>
+#include <syscalls.h>
 #include <OS.h>
 #include <KernelExport.h>
 #include <Debug.h>
@@ -24,6 +26,8 @@ typedef struct lklfs_partition_id {
 	char* content_name;
 } lklfs_partition_id;
 
+extern void *wrap_lkl_mount(int fd, size_t size, int readonly);
+extern int wrap_lkl_umount(void * vol_);
 
 
 static status_t
@@ -95,6 +99,44 @@ lklfs_free_identify_partition_cookie(partition_data* partition, void* _cookie)
 }
 
 
+static status_t
+lklfs_unmount(fs_volume *_volume)
+{
+	return wrap_lkl_umount(_volume->private_volume);
+}
+
+static status_t
+lklfs_read_fs_info(fs_volume *volume, struct fs_info *info)
+{
+	return B_ERROR;
+}
+
+static status_t
+lklfs_get_vnode(fs_volume *volume, ino_t id,
+	fs_vnode *vnode, int *_type, uint32 *_flags, bool reenter)
+{
+	return B_ERROR;
+}
+
+static status_t
+lklfs_write_fs_info(fs_volume *volume, const struct fs_info *info, uint32 mask)
+{
+	return B_ERROR;
+}
+
+static status_t lklfs_sync(fs_volume *volume)
+{
+	return B_ERROR;
+}
+
+fs_volume_ops gLklfsVolumeOps = {
+	&lklfs_unmount,
+	&lklfs_read_fs_info,
+	&lklfs_write_fs_info,
+	&lklfs_sync,
+	&lklfs_get_vnode,
+};
+
 /*
  * Mount a the LKL managed file system into Haiku's VFS
  */
@@ -102,7 +144,28 @@ static status_t
 lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 	const char* args, ino_t* _rootID)
 {
-	return B_ERROR;
+	status_t rc;
+	int fd = -1;
+	int open_flags = O_NOCACHE;
+	struct stat st;
+
+	open_flags |= ((flags & B_MOUNT_READ_ONLY) != 0) ? O_RDONLY : O_RDWR;
+	fd = open(device, O_NOCACHE | open_flags);
+	if (fd < B_OK)
+		return fd;
+
+	rc = _kern_read_stat(fd, NULL, 0, &st, sizeof(struct stat));
+	if (rc != B_OK) {
+		close(fd);
+		return rc;
+	}
+
+	_volume->private_volume = wrap_lkl_mount(fd, st.st_size, flags & B_MOUNT_READ_ONLY);
+	if (_volume->private_volume == NULL)
+		return B_ERROR;
+
+	_volume->ops = &gLklfsVolumeOps;
+	return B_OK;
 }
 
 
