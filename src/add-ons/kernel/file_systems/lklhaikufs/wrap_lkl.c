@@ -16,6 +16,7 @@ extern void* memcpy(void*dst, const void*src, int size);
 extern int dprintf(const char *, ...);
 extern char * strdup(const char * str);
 extern void * malloc(int len);
+extern void free(void*);
 
 extern int wrap_lkl_env_init(int memsize);
 extern void wrap_lkl_env_fini(void);
@@ -28,6 +29,10 @@ typedef struct lklfs_partition_id {
 	__u32 block_size;
 	char * content_name;
 } lklfs_partition_id;
+
+
+extern void *wrap_lkl_mount(int fd, __u64 size, int readonly);
+extern int wrap_lkl_umount(void * vol_);
 
 
 int
@@ -174,3 +179,41 @@ cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie)
 	return 0;
 }
 
+
+typedef struct lklfs_fs_volume {
+	int fd;
+	int readonly;
+	__kernel_dev_t dev;
+	char mnt_path[sizeof("/mnt/xxxxxxxxxxxxxxxx")];
+} lklfs_fs_volume;
+
+
+void *
+wrap_lkl_mount(int fd, __u64 size, int readonly)
+{
+	lklfs_fs_volume * vol = (lklfs_fs_volume*) malloc(sizeof(lklfs_fs_volume));
+	if (vol == NULL)
+		return NULL;
+
+	vol->fd = fd;
+	vol->readonly = readonly;
+	snprintf(vol->mnt_path, sizeof(vol->mnt_path), "/mnt/xxxxxxxxxxxxxxxx");
+
+	vol->dev = mount_disk(fd, size, readonly ? MS_RDONLY : 0, vol->mnt_path, sizeof(vol->mnt_path));
+	if (vol->dev == 0) {
+		free(vol);
+		return NULL;
+	}
+
+	dprintf("wrap_lkl_mount:: success\n");
+	return vol;
+}
+
+int
+wrap_lkl_umount(void * vol_)
+{
+	lklfs_fs_volume * vol = (lklfs_fs_volume *) vol_;
+	__kernel_dev_t dev = vol->dev;
+	free(vol);
+	return umount_disk(dev);
+}
