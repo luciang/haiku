@@ -45,12 +45,11 @@ lklfs_std_ops(int32 op, ...)
 }
 
 
-/*
- * Check whether LKL can mount this file system.
- *
- * @_cookie will hold a pointer to a structure defined by this driver
- * to identify the file system and will be passed to other functions.
- */
+/*! Check whether LKL can mount this file system.
+
+	@_cookie will hold a pointer to a structure defined by this driver
+	to identify the file system and will be passed to other functions.
+*/
 static float
 lklfs_identify_partition(int fd, partition_data* partition, void** _cookie)
 {
@@ -60,17 +59,14 @@ lklfs_identify_partition(int fd, partition_data* partition, void** _cookie)
 	if (rc != 0)
 		return -1;
 
-	/* most Haiku file systems return 0.8f. If there's a native driver
-	   that can handle this partition type, we give it priority to by
-	   returning something less than 0.8f */
+	// most Haiku file systems return 0.8f. If there's a native driver
+	// that can handle this partition type, we give it priority to by
+	// returning something less than 0.8f */
 	return 0.6f;
 }
 
 
-
-/*
- * Get information about the current partition.
- */
+// Get information about the current partition.
 static status_t
 lklfs_scan_partition(int fd, partition_data* p, void* _cookie)
 {
@@ -78,19 +74,17 @@ lklfs_scan_partition(int fd, partition_data* p, void* _cookie)
 	if (part == NULL || part->content_name == NULL)
 		return B_NO_MEMORY;
 
-	p->status		 = B_PARTITION_VALID;
+	p->status		= B_PARTITION_VALID;
 	p->flags		|= B_PARTITION_FILE_SYSTEM;
-	p->content_size	 = part->content_size;;
-	p->block_size	 = part->block_size;
-	p->content_name	 = part->content_name;
+	p->content_size	= part->content_size;;
+	p->block_size	= part->block_size;
+	p->content_name	= part->content_name;
 
 	return B_OK;
 }
 
 
-/*
- * Free the cookie related information allocated at by lklfs_identify_partition()
- */
+// Free the cookie related information allocated at by lklfs_identify_partition()
 static void
 lklfs_free_identify_partition_cookie(partition_data* partition, void* _cookie)
 {
@@ -99,34 +93,39 @@ lklfs_free_identify_partition_cookie(partition_data* partition, void* _cookie)
 
 
 static status_t
-lklfs_unmount(fs_volume *_volume)
+lklfs_unmount(fs_volume * _volume)
 {
 	return wrap_lkl_umount(_volume->private_volume);
 }
 
+
 static status_t
-lklfs_read_fs_info(fs_volume *volume, struct fs_info *info)
+lklfs_read_fs_info(fs_volume * volume, struct fs_info * info)
 {
 	return B_ERROR;
 }
 
+
 static status_t
-lklfs_get_vnode(fs_volume *volume, ino_t id,
-	fs_vnode *vnode, int *_type, uint32 *_flags, bool reenter)
+lklfs_get_vnode(fs_volume * volume, ino_t id,
+	fs_vnode * vnode, int * _type, uint32 * _flags, bool reenter)
 {
 	return B_ERROR;
 }
 
+
 static status_t
-lklfs_write_fs_info(fs_volume *volume, const struct fs_info *info, uint32 mask)
+lklfs_write_fs_info(fs_volume * volume, const struct fs_info * info, uint32 mask)
 {
 	return B_ERROR;
 }
 
-static status_t lklfs_sync(fs_volume *volume)
+
+static status_t lklfs_sync(fs_volume * volume)
 {
 	return B_ERROR;
 }
+
 
 fs_volume_ops gLklfsVolumeOps = {
 	&lklfs_unmount,
@@ -136,12 +135,11 @@ fs_volume_ops gLklfsVolumeOps = {
 	&lklfs_get_vnode,
 };
 
-/*
- * Mount a the LKL managed file system into Haiku's VFS
- */
+
+// Mount a the LKL managed file system into Haiku's VFS
 static status_t
-lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
-	const char* args, ino_t* _rootID)
+lklfs_mount(fs_volume * _volume, const char * device, uint32 flags,
+	const char * args, ino_t * _rootID)
 {
 	status_t rc;
 	int fd = -1;
@@ -168,8 +166,9 @@ lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 	return B_OK;
 }
 
+
 static uint32
-lklfs_get_supported_operations(partition_data* partition, uint32 mask)
+lklfs_get_supported_operations(partition_data * partition, uint32 mask)
 {
 	dprintf("[lklfs] lklfs_get_supported_operations\n");
 	return B_DISK_SYSTEM_SUPPORTS_INITIALIZING
@@ -177,9 +176,10 @@ lklfs_get_supported_operations(partition_data* partition, uint32 mask)
 		| B_DISK_SYSTEM_SUPPORTS_WRITING;
 }
 
+
 static status_t
-lklfs_initialize(int fd, partition_id partitionID, const char* name,
-	const char* parameterString, off_t partitionSize, disk_job_id job)
+lklfs_initialize(int fd, partition_id partitionID, const char * name,
+	const char * parameterString, off_t partitionSize, disk_job_id job)
 {
 	dprintf("[lklfs] lklfs_initialize\n");
 	return B_OK;
@@ -247,8 +247,9 @@ static file_system_module_info sBeFileSystem = {
 	lklfs_initialize,
 };
 
-module_info *modules[] = {
-	(module_info *)&sBeFileSystem,
+
+module_info * modules[] = {
+	(module_info *) &sBeFileSystem,
 	NULL,
 };
 
