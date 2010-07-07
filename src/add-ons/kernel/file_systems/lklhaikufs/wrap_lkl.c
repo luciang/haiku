@@ -27,13 +27,15 @@ extern void free(void*);
 
 
 
-/*
- * return 0 - in case of error
- * return a non-0 dev_t on success
- */
+/*! Create a Linux device and mount it
+
+	Returns the Linux path to the mounted device in @mntpath.
+	return 0 - in case of error
+	return a non-zero dev_t on success
+*/
 static __kernel_dev_t
 mount_disk(int fd, unsigned long size, unsigned long flags,
-	char *mntpath, unsigned long mntpath_size)
+	char * mntpath, unsigned long mntpath_size)
 {
 	int rc;
 	__kernel_dev_t dev;
@@ -76,27 +78,26 @@ list_files(const char * path)
 {
 	int fd;
 	dprintf("[list_files] -------- printing contents of [%s]\n", path);
-	fd = lkl_sys_open(path, O_RDONLY|O_LARGEFILE|O_DIRECTORY, 0);
+	fd = lkl_sys_open(path, O_RDONLY | O_LARGEFILE | O_DIRECTORY, 0);
 	if (fd >= 0) {
 		char x[4096];
 		int count, reclen;
-		struct __kernel_dirent *de;
+		struct __kernel_dirent * de;
 
 		count = lkl_sys_getdents(fd, (struct __kernel_dirent*) x, sizeof(x));
 
-		de = (struct __kernel_dirent*) x;
+		de = (struct __kernel_dirent *) x;
 		while (count > 0) {
 			reclen = de->d_reclen;
 			dprintf("[list_files] %s %ld\n", de->d_name, de->d_ino);
-			de = (struct __kernel_dirent*) ((char*) de+reclen);
-			count-=reclen;
+			de = (struct __kernel_dirent *) ((char *) de + reclen);
+			count -= reclen;
 		}
 
 		lkl_sys_close(fd);
 	}
 	dprintf("[list_files] ++++++++ done printing contents of [%s]\n", path);
 }
-
 
 
 static int
@@ -171,7 +172,7 @@ typedef struct lklfs_fs_volume {
 void *
 wrap_lkl_mount(int fd, __u64 size, int readonly)
 {
-	lklfs_fs_volume * vol = (lklfs_fs_volume*) malloc(sizeof(lklfs_fs_volume));
+	lklfs_fs_volume * vol = (lklfs_fs_volume *) malloc(sizeof(lklfs_fs_volume));
 	if (vol == NULL)
 		return NULL;
 
