@@ -198,3 +198,4 @@ wrap_lkl_umount(void * vol_)
 	free(vol);
 	return umount_disk(dev);
 }
+
