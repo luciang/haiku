@@ -12,23 +12,18 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 
-extern int dprintf(const char*, ...);
+#define BRIDGE_LKL
+#include "lkl-haiku-bridge.h"
+
+
+// we can't include Haiku's headers here because they define types
+// already defined in lkl's headers. Because of this we have to
+// manually declare functions defined by Haiku that we use here.
+extern void* memcpy(void* dst, const void* src, int size);
+extern int dprintf(const char* , ...);
 extern char* strdup(const char* str);
 extern void* malloc(int len);
 extern void free(void*);
-extern void* memcpy(void* dst, const void* src, int size);
-extern int cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie);
-extern int cookie_lklfs_scan_partition(void* _cookie, __s64* p_content_size, __u32* p_block_size,
-								char** p_content_name);
-extern void* wrap_lkl_mount(int fd, __u64 size, int readonly);
-extern int wrap_lkl_umount(void* vol_);
-
-
-typedef struct lklfs_partition_id {
-	__s64 content_size;
-	__u32 block_size;
-	char* content_name;
-} lklfs_partition_id;
 
 
 
@@ -50,7 +45,7 @@ mount_disk(int fd, unsigned long size, unsigned long flags,
 
 	rc = lkl_mount_dev(dev, NULL, flags, NULL, mntpath, mntpath_size);
 	if (rc != 0) {
-		dprintf("mount_disk> lkl_mount_dev rc=%d\n", rc);
+		dprintf("mount_disk> lkl_mount_dev err rc=%d\n", rc);
 		lkl_disk_del_disk(dev);
 		return 0;
 	}
@@ -110,7 +105,6 @@ fill_partition_id(const char * mnt_path, lklfs_partition_id * part)
 	struct __kernel_statfs stat;
 	int rc;
 	rc = lkl_sys_statfs(mnt_path, &stat);
-	dprintf("[[cookie_lklfs_scan_partition]]: lkl_sys_statfs(%s) rc=%d\n", mnt_path, rc);
 	if (rc < 0)
 		return -1;
 
@@ -138,18 +132,19 @@ cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie)
 	if (dev == 0)
 		return -1;
 
-	// debug
+	// sone debug routines, just checking if stuff works correctly.
 	dprintf("wrap_lkl_identify_partition:: mnt_str=%s\n", mnt_str);
 	list_files(mnt_str);
 	list_files("."); // should be equal to '/'
 
-	// save some information for later (for lklfs_scan_partition)
+
+	// save some information for a later call for lklfs_scan_partition
 	rc = fill_partition_id(mnt_str, &part);
 	if (rc != 0)
 		dprintf("wrap_lkl_identify_partition: fill_partition_id returned rc=%d\n", rc);
 
-	// umount the partition as we've gathered all needed info and this
-	// fd won't be valid in other fs calls (e.g. scan_partition) anyway.
+	// umount the partition as we've gathered all needed info and this.
+	// This fd won't be valid in other fs calls (e.g. scan_partition) anyway.
 	rc |= umount_disk(dev);
 	if (rc != 0) {
 		dprintf("wrap_lkl_identify_partition: umount_disk failed rc=%d\n", rc);
