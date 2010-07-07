@@ -11,6 +11,7 @@
 #include <asm/env.h>
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/stat.h>
 
 #define BRIDGE_LKL
 #include "lkl-haiku-bridge.h"
@@ -34,12 +35,12 @@ extern void free(void * p);
 	return a non-zero dev_t on success
 */
 static __kernel_dev_t
-mount_disk(int fd, unsigned long size, unsigned long flags,
+mount_disk(int fd, __u64 size, unsigned long flags,
 	char * mntpath, unsigned long mntpath_size)
 {
 	int rc;
 	__kernel_dev_t dev;
-	dev = lkl_disk_add_disk((void*) fd, size);
+	dev = lkl_disk_add_disk((void*) fd, size / 512);
 	dprintf("mount_disk> dev=%d\n", (int) dev);
 	if (dev == 0)
 		return 0;
@@ -120,7 +121,7 @@ fill_partition_id(const char * mnt_path, lklfs_partition_id * part)
 
 
 int
-cookie_lklfs_identify_partition(int fd, __s64 size, void** _cookie)
+lklfs_identify_partition_impl(int fd, lh_off_t size, void** _cookie)
 {
 	int rc = 0;
 	__kernel_dev_t dev;
@@ -170,17 +171,19 @@ typedef struct lklfs_fs_volume {
 
 
 void *
-wrap_lkl_mount(int fd, __u64 size, int readonly)
+lklfs_mount_impl(int fd, lh_off_t size, int readonly)
 {
 	lklfs_fs_volume * vol = (lklfs_fs_volume *) malloc(sizeof(lklfs_fs_volume));
 	if (vol == NULL)
 		return NULL;
 
+	int flags = (readonly ? MS_RDONLY : 0);
+
 	vol->fd = fd;
 	vol->readonly = readonly;
 	snprintf(vol->mnt_path, sizeof(vol->mnt_path), "/mnt/xxxxxxxxxxxxxxxx");
 
-	vol->dev = mount_disk(fd, size, readonly ? MS_RDONLY : 0, vol->mnt_path, sizeof(vol->mnt_path));
+	vol->dev = mount_disk(fd, size, flags, vol->mnt_path, sizeof(vol->mnt_path));
 	if (vol->dev == 0) {
 		free(vol);
 		return NULL;
@@ -190,12 +193,40 @@ wrap_lkl_mount(int fd, __u64 size, int readonly)
 	return vol;
 }
 
+
 int
-wrap_lkl_umount(void * vol_)
+lklfs_umount_impl(void * vol_)
 {
 	lklfs_fs_volume * vol = (lklfs_fs_volume *) vol_;
 	__kernel_dev_t dev = vol->dev;
 	free(vol);
 	return umount_disk(dev);
+}
+
+
+// Returns the inode corresponding to @path, relative to @vol_'s  mount point.
+// Returns -1 on error.
+lh_ino_t
+lklfs_get_ino(void * vol_, const char * path)
+{
+	int rc;
+	struct __kernel_stat stat;
+	lklfs_fs_volume * vol = (lklfs_fs_volume *) vol_;
+	int len = strlen(vol->mnt_path) + sizeof('/') + strlen(path) + sizeof('\0');
+	char * p = (char *) malloc(len);
+	if (p == NULL)
+		return -1;
+
+	snprintf(p, len, "%s/%s", vol->mnt_path, path);
+	rc = lkl_sys_newstat(p, &stat);
+	free(p);
+	if (rc < 0) {
+		dprintf("lklfs_get_ino:: cannot stat [%s], rc=%d\n", p, rc);
+		free(p);
+		return -1;
+	}
+
+	free(p);
+	return stat.st_ino;
 }
 
