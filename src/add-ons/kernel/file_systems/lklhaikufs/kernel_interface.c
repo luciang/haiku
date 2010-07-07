@@ -13,21 +13,16 @@
 #include <KernelExport.h>
 #include <Debug.h>
 
-extern int wrap_lkl_env_init(int memsize);
-extern void wrap_lkl_env_fini(void);
-extern int cookie_lklfs_identify_partition(int fd, off_t size, void ** _cookie);
-extern int cookie_lklfs_scan_partition(void *_cookie, off_t * p_content_size, uint32 * p_block_size,
-									   char ** p_content_name);
-extern void cookie_lklfs_free_cookie(void *_cookie);
+#define BRIDGE_HAIKU
+#include "lkl-haiku-bridge.h"
 
-typedef struct lklfs_partition_id {
-	off_t content_size;
-	uint32 block_size;
-	char * content_name;
-} lklfs_partition_id;
 
-extern void *wrap_lkl_mount(int fd, size_t size, int readonly);
-extern int wrap_lkl_umount(void * vol_);
+// We can't include Haiku's headers directly because Haiku and LKL
+// define types with the same name in different ways.
+extern int lkl_env_init(int memsize);
+extern void lkl_env_fini(void);
+
+const int LKL_MEMORY_SIZE = 64 * 1024 * 1024; // 64MiB
 
 
 static status_t
@@ -35,11 +30,12 @@ lklfs_std_ops(int32 op, ...)
 {
 	switch (op) {
 		case B_MODULE_INIT:
-			dprintf("[lklfs] INIT\n");
-			wrap_lkl_env_init(64*1024*1024);
+			// boot LKL
+			lkl_env_init(LKL_MEMORY_SIZE);
 			return B_OK;
 		case B_MODULE_UNINIT:
-			wrap_lkl_env_fini();
+			// shutdown LKL
+			lkl_env_fini();
 			dprintf("[lklfs] std ops UNinit -- kernel shut down\n");
 			return B_OK;
 		default:
@@ -64,8 +60,9 @@ lklfs_identify_partition(int fd, partition_data* partition, void** _cookie)
 	if (rc != 0)
 		return -1;
 
-	/* most Haiku file systems return 0.8f. We give priority to native
-	   file system drivers returning something less than 0.8f */
+	/* most Haiku file systems return 0.8f. If there's a native driver
+	   that can handle this partition type, we give it priority to by
+	   returning something less than 0.8f */
 	return 0.6f;
 }
 
@@ -87,7 +84,6 @@ lklfs_scan_partition(int fd, partition_data* p, void* _cookie)
 	p->block_size	 = part->block_size;
 	p->content_name	 = part->content_name;
 
-	dprintf("lklfs_scan_partition: ret OK\n");
 	return B_OK;
 }
 
@@ -99,7 +95,6 @@ static void
 lklfs_free_identify_partition_cookie(partition_data* partition, void* _cookie)
 {
 	free(_cookie);
-	dprintf("lklfs_free_identify_partition_cookie: ret\n");
 }
 
 
@@ -177,7 +172,6 @@ static uint32
 lklfs_get_supported_operations(partition_data* partition, uint32 mask)
 {
 	dprintf("[lklfs] lklfs_get_supported_operations\n");
-	// TODO: We should at least check the partition size.
 	return B_DISK_SYSTEM_SUPPORTS_INITIALIZING
 		| B_DISK_SYSTEM_SUPPORTS_CONTENT_NAME
 		| B_DISK_SYSTEM_SUPPORTS_WRITING;
