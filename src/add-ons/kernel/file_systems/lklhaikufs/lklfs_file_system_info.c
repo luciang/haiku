@@ -11,13 +11,15 @@
 #include <syscalls.h>
 #include <KernelExport.h>
 #include <Debug.h>
+#include <string.h>
 
 #define BRIDGE_HAIKU
 #include "lkl-haiku-bridge.h"
 
 // defined in lklfs_volume_ops.c
 extern fs_volume_ops lklfs_volume_ops;
-
+// defined in lklfs_vnode_ops.c
+extern fs_vnode_ops lklfs_vnode_ops;
 // defined in kernel_interface.c
 extern status_t lklfs_std_ops(int32 op, ...);
 
@@ -32,7 +34,7 @@ static float
 lklfs_identify_partition(int fd, partition_data* partition, void** _cookie)
 {
 	int rc;
-	rc = cookie_lklfs_identify_partition(fd, partition->size, _cookie);
+	rc = lklfs_identify_partition_impl(fd, partition->size, _cookie);
 	if (rc != 0)
 		return -1;
 
@@ -77,9 +79,10 @@ lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 	status_t rc;
 	int fd = -1;
 	int open_flags = O_NOCACHE;
+	int readonly = (flags & B_MOUNT_READ_ONLY) != 0;
 	struct stat st;
 
-	open_flags |= ((flags & B_MOUNT_READ_ONLY) != 0) ? O_RDONLY : O_RDWR;
+	open_flags |= readonly ? O_RDONLY : O_RDWR;
 	fd = open(device, O_NOCACHE | open_flags);
 	if (fd < B_OK)
 		return fd;
@@ -90,11 +93,22 @@ lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 		return rc;
 	}
 
-	_volume->private_volume = wrap_lkl_mount(fd, st.st_size, flags & B_MOUNT_READ_ONLY);
-	if (_volume->private_volume == NULL)
-		return B_ERROR;
-
 	_volume->ops = &lklfs_volume_ops;
+	_volume->private_volume = lklfs_mount_impl(fd, st.st_size, readonly);
+	if (_volume->private_volume == NULL) {
+		close(fd);
+		return B_ERROR;
+	}
+
+	*_rootID = lklfs_get_ino(_volume->private_volume, "/");
+	rc = publish_vnode(_volume, *_rootID, (void*)1 /* non-null dummy value */,
+					   &lklfs_vnode_ops, S_IFDIR, 0);
+	if (rc < B_OK) {
+		// TODO: FIXME: umount?
+		close(fd);
+		return rc;
+	}
+
 	return B_OK;
 }
 
