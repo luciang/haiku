@@ -101,8 +101,10 @@ lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 	}
 
 	*_rootID = lklfs_get_ino(_volume->private_volume, "/");
-	rc = publish_vnode(_volume, *_rootID, (void*)1 /* non-null dummy value */,
-					   &lklfs_vnode_ops, S_IFDIR, 0);
+	// the private_vnode field of a vnode will be the relative path
+	// of that vnode inside this instance of the file system.
+	rc = publish_vnode(_volume, *_rootID, (void*) "/",
+		&lklfs_vnode_ops, S_IFDIR, 0);
 	if (rc < B_OK) {
 		// TODO: FIXME: umount?
 		close(fd);

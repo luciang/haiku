@@ -80,7 +80,29 @@ static status_t
 lklfs_read_stat(fs_volume* volume, fs_vnode* vnode,
 	struct stat* stat)
 {
-	NIMPL;
+	struct lh_stat ls;
+	int rc;
+	rc = lklfs_read_stat_impl(volume->private_volume, vnode->private_node, &ls);
+	if (rc != 0)
+		return B_ERROR;
+
+	stat->st_mode	 = ls.st_mode;
+	stat->st_nlink	 = ls.st_nlink;
+	stat->st_uid	 = ls.st_uid;
+	stat->st_gid	 = ls.st_gid;
+	stat->st_size	 = ls.st_size;
+	stat->st_blksize = ls.st_blksize;
+	stat->st_blocks	 = ls.st_blocks;
+	stat->st_atim.tv_sec	 = ls.st_atim;
+	stat->st_atim.tv_nsec	 = ls.st_atim_nsec;
+	stat->st_mtim.tv_sec	 = ls.st_mtim;
+	stat->st_mtim.tv_nsec	 = ls.st_mtim_nsec;
+	stat->st_ctim.tv_sec	 = ls.st_ctim;
+	stat->st_ctim.tv_nsec	 = ls.st_ctim_nsec;
+	stat->st_crtim.tv_sec	 = ls.st_crtim;
+	stat->st_crtim.tv_nsec	 = ls.st_crtim_nsec;
+
+	return B_OK;
 }
 
 
