@@ -27,6 +27,25 @@ extern void * malloc(int len);
 extern void free(void * p);
 
 
+typedef struct lklfs_fs_volume {
+	int fd;
+	int readonly;
+	__kernel_dev_t dev;
+	char mnt_path[sizeof("/mnt/xxxxxxxxxxxxxxxx")];
+} lklfs_fs_volume;
+
+
+static inline
+char *
+rel_to_abs_path(struct lklfs_fs_volume * vol, const char * rel_path)
+{
+	int len = strlen(vol->mnt_path) + sizeof('/') + strlen(rel_path) + sizeof('\0');
+	char * abs_path = malloc(len);
+	if (abs_path != NULL)
+		snprintf(abs_path, len, "%s/%s", vol->mnt_path, rel_path);
+
+	return abs_path;
+}
 
 /*! Create a Linux device and mount it
 
@@ -162,12 +181,6 @@ lklfs_identify_partition_impl(int fd, lh_off_t size, void** _cookie)
 }
 
 
-typedef struct lklfs_fs_volume {
-	int fd;
-	int readonly;
-	__kernel_dev_t dev;
-	char mnt_path[sizeof("/mnt/xxxxxxxxxxxxxxxx")];
-} lklfs_fs_volume;
 
 
 void *
@@ -211,22 +224,17 @@ lklfs_get_ino(void * vol_, const char * path)
 {
 	int rc;
 	struct __kernel_stat stat;
-	lklfs_fs_volume * vol = (lklfs_fs_volume *) vol_;
-	int len = strlen(vol->mnt_path) + sizeof('/') + strlen(path) + sizeof('\0');
-	char * p = (char *) malloc(len);
-	if (p == NULL)
+	char * abs_path = rel_to_abs_path(vol_, path);
+	if (abs_path == NULL)
 		return -1;
 
-	snprintf(p, len, "%s/%s", vol->mnt_path, path);
-	rc = lkl_sys_newstat(p, &stat);
-	free(p);
+	rc = lkl_sys_newstat(abs_path, &stat);
+	free(abs_path);
 	if (rc < 0) {
-		dprintf("lklfs_get_ino:: cannot stat [%s], rc=%d\n", p, rc);
-		free(p);
+		dprintf("lklfs_get_ino:: cannot stat [%s], rc=%d\n", abs_path, rc);
 		return -1;
 	}
 
-	free(p);
 	return stat.st_ino;
 }
 
@@ -252,6 +260,41 @@ lklfs_read_fs_info_impl(void * vol_, struct lh_fs_info * fi)
 	fi->free_nodes	 = stat.f_ffree;
 	snprintf(fi->volume_name, sizeof(fi->volume_name),
 		"FIXME: lklfs_read_fs_info_impl fi->volume_name");
+
+	return 0;
+}
+
+
+int
+lklfs_read_stat_impl(void * vol_, void * vnode_, struct lh_stat * ls)
+{
+	int rc;
+	struct __kernel_stat stat;
+	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
+	if (abs_path == NULL)
+		return -1;
+
+	rc = lkl_sys_newstat(abs_path, &stat);
+	free(abs_path);
+	if (rc != 0)
+		return rc;
+
+	ls->st_mode		  = stat.st_mode;
+	ls->st_nlink	  = stat.st_nlink;
+	ls->st_uid		  = stat.st_uid;
+	ls->st_gid		  = stat.st_gid;
+	ls->st_size		  = stat.st_size;
+	ls->st_blksize	  = stat.st_blksize;
+	ls->st_blocks	  = stat.st_blocks;
+	ls->st_atim		  = stat.st_atime;
+	ls->st_atim_nsec  = stat.st_atime_nsec;
+	ls->st_mtim		  = stat.st_mtime;
+	ls->st_mtim_nsec  = stat.st_mtime_nsec;
+	ls->st_ctim		  = stat.st_ctime;
+	ls->st_ctim_nsec  = stat.st_ctime_nsec;
+	// FIXME: POSIX stat does not have creation time
+	ls->st_crtim	  = stat.st_ctime;
+	ls->st_crtim_nsec = stat.st_ctime_nsec;
 
 	return 0;
 }

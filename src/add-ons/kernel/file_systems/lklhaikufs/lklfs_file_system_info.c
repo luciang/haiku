@@ -102,7 +102,9 @@ lklfs_mount(fs_volume * _volume, const char * device, uint32 flags,
 	}
 
 	*_rootID = lklfs_get_ino(_volume->private_volume, "/");
-	rc = publish_vnode(_volume, *_rootID, /**/ (void*) 1,
+	// the private_vnode field of a vnode will be the relative path
+	// of that vnode inside this instance of the file system.
+	rc = publish_vnode(_volume, *_rootID, (void*) "/",
 					   &lklfs_vnode_ops, S_IFDIR, 0);
 	if (rc < B_OK) {
 		dprintf("lklfs_mount:: publish_vnode failed rc=%d err=%s\n", (int) rc, strerror(rc));
