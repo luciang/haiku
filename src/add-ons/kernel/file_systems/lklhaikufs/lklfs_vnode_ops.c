@@ -8,6 +8,10 @@
 
 #include <drivers/fs_interface.h>
 #include <KernelExport.h>
+#include <stdlib.h>
+#include <string.h>
+#include <posix/dirent.h>
+
 
 #define BRIDGE_HAIKU
 #include "lkl-haiku-bridge.h"
@@ -179,18 +183,28 @@ lklfs_remove_dir(fs_volume* volume, fs_vnode* parent,
 }
 
 
+//	Directory cookies are in fact the LKL file descriptor values
 static status_t
 lklfs_open_dir(fs_volume* volume, fs_vnode* vnode,
 	void** _cookie)
 {
-	NIMPL;
+	int rc;
+	rc = lklfs_open_dir_impl(volume->private_volume, vnode->private_node, _cookie);
+	if (rc != 0)
+		return B_ERROR;
+
+	return B_OK;
 }
 
 
 static status_t
 lklfs_close_dir(fs_volume* volume, fs_vnode* vnode, void* cookie)
 {
-	NIMPL;
+	int rc = lklfs_close_dir_impl(cookie);
+	if (rc != 0)
+		return B_ERROR;
+
+	return B_OK;
 }
 
 
@@ -198,15 +212,60 @@ static status_t
 lklfs_free_dir_cookie(fs_volume* volume, fs_vnode* vnode,
 	void* cookie)
 {
-	NIMPL;
+	// nothing was allocated for the cookie => nothing to be freed
+	// the cookie is in fact a the value of a file descriptor
+	// coresponding to the opened directory in LKL.
+	return B_OK;
 }
 
 
 static status_t
 lklfs_read_dir(fs_volume* volume, fs_vnode* vnode, void* cookie,
-	struct dirent* buffer, size_t bufferSize, uint32* _num)
+	struct dirent* buffer, size_t bufferSize, uint32* pnum)
 {
-	NIMPL;
+	int i, num;
+	struct lh_dirent * ld;
+	size_t remaining = bufferSize;
+
+	// we allocate a similarly sized buffer in which we read the only
+	// info we're interested in from the Linux kernel
+	ld = (struct lh_dirent *) malloc(bufferSize);
+	if (ld == NULL)
+		return B_NO_MEMORY;
+
+	num = lklfs_read_dir_impl(cookie, ld, bufferSize);
+	if (num < 0) {
+		free(ld);
+		return B_ERROR;
+	}
+
+	if (num == 0) {
+		*pnum = 0;
+		free(ld);
+		return B_OK;
+	}
+
+
+
+	for(i = 0; (i < num) && (remaining > 0); i++) {
+		// TODO: check for nodes that are mount points for other volumes
+		// If one dentry is a mount point for another volume, I think
+		// we must return the dev_t corresponding to the other volume.
+		buffer->d_dev = volume->id;
+		buffer->d_ino = ld[i].d_ino;
+
+		// space for '\0' is aleady allocated in 'dirent':
+		// the last field is 'char d_name [1]'.
+		buffer->d_reclen = sizeof(struct dirent) + strlen(ld[i].d_name);
+		strncpy((char *) &buffer->d_name, ld[i].d_name, remaining);
+		remaining -= buffer->d_reclen;
+		buffer = (struct dirent *) ((char *) buffer + buffer->d_reclen);
+	}
+
+	*pnum = i;
+
+	free(ld);
+	return B_OK;
 }
 
 

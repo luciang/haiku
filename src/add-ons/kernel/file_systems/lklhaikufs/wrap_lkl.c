@@ -21,10 +21,11 @@
 // already defined in lkl's headers. Because of this we have to
 // manually declare functions defined by Haiku that we use here.
 extern void* memcpy(void* dst, const void* src, int size);
-extern int dprintf(const char* , ...);
+extern int dprintf(const char* fmt, ...);
 extern char* strdup(const char* str);
+extern char* strncat(char*dest, const char*src, lh_size_t n);
 extern void* malloc(int len);
-extern void free(void*);
+extern void free(void* p);
 
 
 #define LKL_MOUNT_PATH_TEMPLATE			"/mnt/xxxxxxxxxxxxxxxx"
@@ -299,5 +300,75 @@ lklfs_read_stat_impl(void * vol_, void * vnode_, struct lh_stat * ls)
 	ls->st_crtim_nsec = stat.st_ctime_nsec;
 
 	return 0;
+}
+
+
+int
+lklfs_open_dir_impl(void * vol_, void * vnode_, void ** _cookie)
+{
+	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
+	if (abs_path == NULL)
+		return -1;
+
+	int fd = lkl_sys_open(abs_path, O_RDONLY | O_LARGEFILE | O_DIRECTORY, 0);
+	free(abs_path);
+	*_cookie = (void *) fd;
+	if (fd < 0)
+		return -1;
+
+	return 0;
+}
+
+
+int
+lklfs_close_dir_impl(void * _cookie)
+{
+	int fd = (int) _cookie;
+	int rc = lkl_sys_close(fd);
+	if (rc != 0)
+		return -1;
+
+	return 0;
+}
+
+
+// Returns the number of entries successfully read or -1 on error.
+int
+lklfs_read_dir_impl(void * _cookie, struct lh_dirent * ld, int bufferSize)
+{
+	int bytesRead;
+	int fd = (int) _cookie;
+	int ld_dirent_count = bufferSize / sizeof(struct lh_dirent);
+	int i = 0;
+	struct __kernel_dirent * de, * de_;
+
+
+	if (ld_dirent_count == 0)
+		return -1;
+
+	// save a backup copy of the pointer for free()
+	de_ = de = (struct __kernel_dirent *) malloc(bufferSize);
+	if (de == NULL)
+		return -1;
+
+
+	bytesRead = lkl_sys_getdents(fd, de, bufferSize);
+	if (bytesRead < 0) {
+		free(de);
+		return -1;
+	}
+
+	while (bytesRead > 0 && i < ld_dirent_count) {
+		bytesRead -= de->d_reclen;
+		ld[i].d_ino = de->d_ino;
+		ld[i].d_name[0] = '\0';
+		strncat(ld[i].d_name, de->d_name, sizeof(ld[i].d_name) - 1);
+		de = (struct __kernel_dirent *) ((char *) de + de->d_reclen);
+		i++;
+	}
+
+	// always remember to delete the pointer that was received from malloc()
+	free(de_);
+	return i;
 }
 
