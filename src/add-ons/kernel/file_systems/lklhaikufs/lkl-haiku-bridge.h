@@ -76,11 +76,19 @@ struct lh_stat {
 	long			st_crtim_nsec;	/* creation time (nanoseconds) */
 };
 
+struct lh_dirent {
+	lh_ino_t d_ino;
+	char d_name[256];
+};
+
 extern int lklfs_identify_partition_impl(int fd, lh_off_t size, void** _cookie);
 extern void * lklfs_mount_impl(int fd, lh_off_t size, int readonly);
 extern int lklfs_umount_impl(void * vol_);
 extern lh_ino_t lklfs_get_ino(void * vol_, const char * path);
 extern int lklfs_read_fs_info_impl(void * vol_, struct lh_fs_info * fi);
 extern int lklfs_read_stat_impl(void * vol_, void * vnode_, struct lh_stat * ls);
+extern int lklfs_open_dir_impl(void * vol_, void * vnode_, void ** _cookie);
+extern int lklfs_close_dir_impl(void * _cookie);
+extern int lklfs_read_dir_impl(void * _cookie, struct lh_dirent * ld, int bufferSize);
 
 #endif // LKL_HAIKU_BRIDGE_H__
