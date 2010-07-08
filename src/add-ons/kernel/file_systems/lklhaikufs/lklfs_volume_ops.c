@@ -7,6 +7,8 @@
  */
 
 #include <fs_volume.h>
+#include <fs_info.h>
+#include <string.h>
 #include <drivers/fs_interface.h>
 #include <KernelExport.h>
 
@@ -27,7 +29,22 @@ lklfs_unmount(fs_volume * _volume)
 static status_t
 lklfs_read_fs_info(fs_volume * volume, struct fs_info * info)
 {
-	NIMPL;
+	struct lh_fs_info fi;
+	int rc;
+	rc = lklfs_read_fs_info_impl(volume->private_volume, &fi);
+	if (rc != 0)
+		return B_ERROR;
+
+	info->flags		   = (fi.flags & LH_FS_READONLY) ? B_FS_IS_READONLY : 0;
+	info->block_size   = fi.block_size;
+	info->io_size	   = fi.io_size;
+	info->total_blocks = fi.total_blocks;
+	info->free_blocks  = fi.free_blocks;
+	info->total_nodes  = fi.total_nodes;
+	info->free_nodes   = fi.free_nodes;
+	strncpy(info->volume_name, fi.volume_name, sizeof(info->volume_name));
+
+	return B_OK;
 }
 
 
