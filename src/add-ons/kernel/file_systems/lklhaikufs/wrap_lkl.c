@@ -27,11 +27,13 @@ extern void* malloc(int len);
 extern void free(void*);
 
 
+#define LKL_MOUNT_PATH_TEMPLATE			"/mnt/xxxxxxxxxxxxxxxx"
+#define LKL_MOUNT_PATH_TEMPLATE_LEN		sizeof(LKL_MOUNT_PATH_TEMPLATE)
 typedef struct lklfs_fs_volume {
 	int fd;
 	int readonly;
 	__kernel_dev_t dev;
-	char mnt_path[sizeof("/mnt/xxxxxxxxxxxxxxxx")];
+	char mnt_path[LKL_MOUNT_PATH_TEMPLATE_LEN];
 } lklfs_fs_volume;
 
 
@@ -144,7 +146,7 @@ lklfs_identify_partition_impl(int fd, lh_off_t size, void** _cookie)
 {
 	int rc = 0;
 	__kernel_dev_t dev;
-	char mnt_str[] = { "/mnt/xxxxxxxxxxxxxxxx" };
+	char mnt_str[] = { LKL_MOUNT_PATH_TEMPLATE };
 	struct lklfs_partition_id part;
 
 
@@ -194,7 +196,7 @@ lklfs_mount_impl(int fd, lh_off_t size, int readonly)
 
 	vol->fd = fd;
 	vol->readonly = readonly;
-	snprintf(vol->mnt_path, sizeof(vol->mnt_path), "/mnt/xxxxxxxxxxxxxxxx");
+	snprintf(vol->mnt_path, sizeof(vol->mnt_path), LKL_MOUNT_PATH_TEMPLATE);
 
 	vol->dev = mount_disk(fd, size, flags, vol->mnt_path, sizeof(vol->mnt_path));
 	if (vol->dev == 0) {
