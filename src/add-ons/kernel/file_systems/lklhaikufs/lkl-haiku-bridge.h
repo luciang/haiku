@@ -38,10 +38,25 @@ typedef struct lklfs_partition_id {
 	char* content_name;
 } lklfs_partition_id;
 
+
+// lh_fs_info.flags
+#define LH_FS_READONLY 0x01
+
+struct lh_fs_info {
+	lh_u32		flags;			/* flags (see above) */
+	lh_off_t	block_size;		/* fundamental block size */
+	lh_off_t	io_size;		/* optimal i/o size */
+	lh_off_t	total_blocks;	/* total number of blocks */
+	lh_off_t	free_blocks;	/* number of free blocks */
+	lh_off_t	total_nodes;	/* total number of nodes */
+	lh_off_t	free_nodes;		/* number of free nodes */
+	char		volume_name[20];	/* volume name */
+};
+
 extern int lklfs_identify_partition_impl(int fd, lh_off_t size, void** _cookie);
 extern void* lklfs_mount_impl(int fd, lh_off_t size, int readonly);
 extern int lklfs_umount_impl(void* vol_);
 extern lh_ino_t lklfs_get_ino(void* vol_, const char* path);
-
+extern int lklfs_read_fs_info_impl(void* vol_, struct lh_fs_info* fi);
 
 #endif // LKL_HAIKU_BRIDGE_H__

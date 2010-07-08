@@ -230,3 +230,29 @@ lklfs_get_ino(void * vol_, const char * path)
 	return stat.st_ino;
 }
 
+
+int
+lklfs_read_fs_info_impl(void * vol_, struct lh_fs_info * fi)
+{
+	lklfs_fs_volume * vol = (lklfs_fs_volume *) vol_;
+	struct __kernel_statfs stat;
+	int rc;
+
+	rc = lkl_sys_statfs(vol->mnt_path, &stat);
+	if (rc < 0)
+		return -1;
+
+	fi->flags		 = vol->readonly ? LH_FS_READONLY : 0;
+	fi->block_size	 = stat.f_bsize;
+	fi->io_size		 = stat.f_bsize;
+		// TODO: is this the optimal I/O size?
+	fi->total_blocks = stat.f_blocks;
+	fi->free_blocks	 = stat.f_bfree;
+	fi->total_nodes	 = stat.f_files;
+	fi->free_nodes	 = stat.f_ffree;
+	snprintf(fi->volume_name, sizeof(fi->volume_name),
+		"FIXME: lklfs_read_fs_info_impl fi->volume_name");
+
+	return 0;
+}
+
