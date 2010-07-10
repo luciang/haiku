@@ -15,6 +15,7 @@
 
 #define BRIDGE_LKL
 #include "lkl-haiku-bridge.h"
+#include "lh-fcntl.h"
 
 
 // we can't include Haiku's headers here because they define types
@@ -386,3 +387,41 @@ lklfs_rewind_dir_impl(void * cookie)
 	return 0;
 }
 
+
+int
+lklfs_open_impl(void * vol_, void * vnode_, int lhOpenMode, void ** cookie_)
+{
+	int fd;
+	int lklOpenMode = lh_to_lkl_openMode(lhOpenMode);
+	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
+	if (abs_path == NULL)
+		return -1;
+
+	fd = lkl_sys_open(abs_path, lklOpenMode, 0);
+		// don't need to worry about the permission bits as this
+		// will	never create new files.
+	free(abs_path);
+	if (fd < 0)
+		return -1;
+
+	*cookie_ = (void*) fd;
+
+	return 0;
+}
+
+
+int
+lklfs_access_impl(void * vol_, void * vnode_, int accessMode)
+{
+	int fd;
+	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
+	if (abs_path == NULL)
+		return -1;
+
+	fd = lkl_sys_access(abs_path, accessMode);
+	free(abs_path);
+	if (fd < 0)
+		return -1;
+
+	return 0;
+}

@@ -15,6 +15,8 @@
 
 #define BRIDGE_HAIKU
 #include "lkl-haiku-bridge.h"
+#include "lh-fcntl.h"
+
 
 #define NIMPL 															\
 	do {																\
@@ -76,7 +78,12 @@ lklfs_rename(fs_volume* volume, fs_vnode* fromDir,
 static status_t
 lklfs_access(fs_volume* volume, fs_vnode* vnode, int mode)
 {
-	NIMPL;
+	int rc;
+	rc = lklfs_access_impl(volume->private_volume, vnode->private_node, mode);
+	if (rc != 0)
+		return B_ERROR;
+
+	return B_OK;
 }
 
 
@@ -131,7 +138,41 @@ static status_t
 lklfs_open(fs_volume* volume, fs_vnode* vnode, int openMode,
 	void** _cookie)
 {
-	NIMPL;
+	int rc;
+
+	if ((openMode & O_NOTRAVERSE) != 0) {
+		// FIXME: currently a cookie associated with a opened file is
+		// the LKL file descriptor to that file. The LKL system call
+		// API cannot at this moment open file descriptor for symlinks.
+		dprintf("lklfs_open(%s, O_NOTRAVERSE) called. NOT Implemented yet!\n",
+			(char *) vnode->private_node);
+		return B_ERROR;
+	}
+
+	if ((openMode & O_TEMPORARY) != 0) {
+		// FIXME: this does not seem to be used in Haiku at this
+		// moment, and I don't know how to enforce this behavior
+		// through LKL's system call API.
+		//
+		// As I cannot enforce this upon each Linux file system
+		// implementation I think this will not be implemented in this
+		// driver.
+		//
+		// TODO: TBD: Other drivers simply ignore this flag and succeed
+		// regardless. Should we do the same? Is this flag going to be
+		// managed at Haiku's VFS layer or deep down in each file
+		// system add-on?
+		dprintf("lklfs_open(%s, O_TEMPORARY) called. NOT Implemented yet!\n",
+			(char *) vnode->private_node);
+		return B_ERROR;
+	}
+
+	rc = lklfs_open_impl(volume->private_volume, vnode->private_node,
+		haiku_to_lh_openMode(openMode), _cookie);
+	if (rc != 0)
+		return B_ERROR;
+
+	return B_OK;
 }
 
 
