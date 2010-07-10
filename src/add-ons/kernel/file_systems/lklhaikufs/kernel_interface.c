@@ -18,27 +18,36 @@ extern int cookie_lklfs_scan_partition(void* _cookie, off_t* p_content_size, uin
 									   char** p_content_name);
 extern void cookie_lklfs_free_cookie(void* _cookie);
 
+
+
 static status_t
 lklfs_std_ops(int32 op, ...)
 {
 	switch (op) {
-		case B_MODULE_INIT:
-			lkl_env_init(64*1024*1024);
-			return B_OK;
-		case B_MODULE_UNINIT:
-			lkl_env_fini();
-			return B_OK;
-		default:
-			return B_ERROR;
+	case B_MODULE_INIT:
+		lkl_env_init(64*1024*1024);
+		return B_OK;
+	case B_MODULE_UNINIT:
+		lkl_env_fini();
+		return B_OK;
+	default:
+		return B_ERROR;
 	}
 }
 
 
+/*
+ * Check whether LKL can mount this file system.
+ * 
+ * @_cookie will hold a pointer to a structure defined by this driver
+ * to identify the file system and will be passed to other functions.
+ */
 static float
 lklfs_identify_partition(int fd, partition_data* partition, void** _cookie)
 {
 	int rc;
 	rc = cookie_lklfs_identify_partition(fd, partition->size, _cookie);
+	dprintf("lklfs_identify_partition: rc=%d\n", rc);
 	if (rc != 0)
 		return -1;
 
@@ -48,6 +57,10 @@ lklfs_identify_partition(int fd, partition_data* partition, void** _cookie)
 }
 
 
+
+/*
+ * Get information about the current partition.
+ */
 static status_t
 lklfs_scan_partition(int fd, partition_data* p, void* _cookie)
 {
@@ -58,11 +71,16 @@ lklfs_scan_partition(int fd, partition_data* p, void* _cookie)
 		return B_ERROR;
 	if (p->content_name == NULL)
 		return B_NO_MEMORY;
+
 	p->status = B_PARTITION_VALID;
 	p->flags |= B_PARTITION_FILE_SYSTEM;
 	return B_OK;
 }
 
+
+/*
+ * Free the cookie related information allocated at by lklfs_identify_partition()
+ */
 static void
 lklfs_free_identify_partition_cookie(partition_data* partition, void* _cookie)
 {
@@ -70,11 +88,14 @@ lklfs_free_identify_partition_cookie(partition_data* partition, void* _cookie)
 }
 
 
+/*
+ * Mount a the LKL managed file system into Haiku's VFS
+ */
 static status_t
 lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 	const char* args, ino_t* _rootID)
 {
-	return B_BAD_VALUE;
+	return B_ERROR;
 }
 
 
