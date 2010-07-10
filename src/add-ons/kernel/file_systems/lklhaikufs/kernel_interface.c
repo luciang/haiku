@@ -172,14 +172,6 @@ lklfs_get_supported_operations(partition_data * partition, uint32 mask)
 }
 
 
-static status_t
-lklfs_initialize(int fd, partition_id partitionID, const char * name,
-	const char * parameterString, off_t partitionSize, disk_job_id job)
-{
-	return B_OK;
-}
-
-
 static file_system_module_info sLklFileSystem = {
 	{
 		"file_systems/lklhaikufs" B_CURRENT_FS_API_VERSION,
@@ -238,7 +230,7 @@ static file_system_module_info sLklFileSystem = {
 	NULL,	// move
 	NULL,	// set_content_name
 	NULL,	// set_content_parameters
-	lklfs_initialize,
+	NULL,	// initialize
 };
 
 
