@@ -273,7 +273,12 @@ static status_t
 lklfs_rewind_dir(fs_volume* volume, fs_vnode* vnode,
 	void* cookie)
 {
-	NIMPL;
+	int rc;
+	rc = lklfs_rewind_dir_impl(cookie);
+	if (rc != 0)
+		return B_ERROR;
+
+	return B_OK;
 }
 
 
