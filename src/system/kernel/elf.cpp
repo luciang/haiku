@@ -1961,7 +1961,6 @@ load_kernel_add_on(const char *path)
 	struct elf_image_info *image;
 	const char *fileName;
 	void *reservedAddress;
-	addr_t start;
 	size_t reservedSize;
 	status_t status;
 	ssize_t length;
@@ -2087,7 +2086,6 @@ load_kernel_add_on(const char *path)
 		goto error3;
 	}
 
-	start = (addr_t)reservedAddress;
 	image->data_region.size = 0;
 	image->text_region.size = 0;
 
@@ -2172,17 +2170,6 @@ load_kernel_add_on(const char *path)
 			dprintf("%s: error reading in segment %ld\n", fileName, i);
 			goto error5;
 		}
-	}
-
-	// get the segment order
-	elf_region *firstRegion;
-	elf_region *secondRegion;
-	if (image->text_region.start < image->data_region.start) {
-		firstRegion = &image->text_region;
-		secondRegion = &image->data_region;
-	} else {
-		firstRegion = &image->data_region;
-		secondRegion = &image->text_region;
 	}
 
 	image->data_region.delta += image->data_region.start;
