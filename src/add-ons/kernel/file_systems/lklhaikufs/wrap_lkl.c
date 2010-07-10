@@ -16,6 +16,7 @@
 #define BRIDGE_LKL
 #include "lkl-haiku-bridge.h"
 #include "lh-fcntl.h"
+#include "lh-error.h"
 
 
 // we can't include Haiku's headers here because they define types
@@ -86,14 +87,12 @@ umount_disk(__kernel_dev_t dev)
 {
 	int rc;
 	rc = lkl_umount_dev(dev, 0);
-	if (rc != 0)
-		dprintf( "umount_disk> lkl_umount_dev rc=%d\n", rc);
-	rc = lkl_disk_del_disk(dev);
-	if (rc != 0)
-		dprintf( "umount_disk> lkl_disk_del_disk rc=%d\n", rc);
+	if (rc != 0) {
+		lkl_disk_del_disk(dev);
+		return rc;
+	}
 
-	dprintf( "umount_disk> exiting\n");
-	return rc;
+	return lkl_disk_del_disk(dev);
 }
 
 
@@ -131,13 +130,13 @@ fill_partition_id(const char * mnt_path, lklfs_partition_id * part)
 	int rc;
 	rc = lkl_sys_statfs(mnt_path, &stat);
 	if (rc < 0)
-		return -1;
+		return rc;
 
 	part->content_size = stat.f_blocks * stat.f_bsize;
 	part->block_size = stat.f_bsize;
 	part->content_name = strdup("FIXME: LKL: label retrieval not implemented ");
 	if (part->content_name == NULL)
-		return -1;
+		return -ENOMEM;
 
 	return 0;
 }
@@ -165,20 +164,20 @@ lklfs_identify_partition_impl(int fd, lh_off_t size, void** _cookie)
 
 	// save some information for a later call for lklfs_scan_partition
 	rc = fill_partition_id(mnt_str, &part);
-	if (rc != 0)
-		dprintf("wrap_lkl_identify_partition: fill_partition_id returned rc=%d\n", rc);
+	if (rc != 0) {
+		umount_disk(dev);
+		return rc;
+	}
 
 	// umount the partition as we've gathered all needed info and this.
 	// This fd won't be valid in other fs calls (e.g. scan_partition) anyway.
-	rc |= umount_disk(dev);
-	if (rc != 0) {
-		dprintf("wrap_lkl_identify_partition: umount_disk failed rc=%d\n", rc);
-		return -1;
-	}
+	rc = umount_disk(dev);
+	if (rc != 0)
+		return rc;
 
 	*_cookie = malloc(sizeof(struct lklfs_partition_id));
 	if (*_cookie == NULL)
-		return -1;
+		return -ENOMEM;
 	memcpy(*_cookie, &part, sizeof(part));
 
 	return 0;
@@ -230,13 +229,13 @@ lklfs_get_ino(void * vol_, const char * path)
 	struct __kernel_stat stat;
 	char * abs_path = rel_to_abs_path(vol_, path);
 	if (abs_path == NULL)
-		return -1;
+		return -ENOMEM;
 
 	rc = lkl_sys_newstat(abs_path, &stat);
 	free(abs_path);
 	if (rc < 0) {
 		dprintf("lklfs_get_ino:: cannot stat [%s], rc=%d\n", abs_path, rc);
-		return -1;
+		return rc;
 	}
 
 	return stat.st_ino;
@@ -252,7 +251,7 @@ lklfs_read_fs_info_impl(void * vol_, struct lh_fs_info * fi)
 
 	rc = lkl_sys_statfs(vol->mnt_path, &stat);
 	if (rc < 0)
-		return -1;
+		return rc;
 
 	fi->flags		 = vol->readonly ? LH_FS_READONLY : 0;
 	fi->block_size	 = stat.f_bsize;
@@ -276,7 +275,7 @@ lklfs_read_stat_impl(void * vol_, void * vnode_, struct lh_stat * ls)
 	struct __kernel_stat stat;
 	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
 	if (abs_path == NULL)
-		return -1;
+		return -ENOMEM;
 
 	rc = lkl_sys_newstat(abs_path, &stat);
 	free(abs_path);
@@ -315,7 +314,7 @@ lklfs_open_dir_impl(void * vol_, void * vnode_, void ** _cookie)
 	free(abs_path);
 	*_cookie = (void *) fd;
 	if (fd < 0)
-		return -1;
+		return fd;
 
 	return 0;
 }
@@ -325,11 +324,7 @@ int
 lklfs_close_dir_impl(void * _cookie)
 {
 	int fd = (int) _cookie;
-	int rc = lkl_sys_close(fd);
-	if (rc != 0)
-		return -1;
-
-	return 0;
+	return lkl_sys_close(fd);
 }
 
 
@@ -350,13 +345,13 @@ lklfs_read_dir_impl(void * _cookie, struct lh_dirent * ld, int bufferSize)
 	// save a backup copy of the pointer for free()
 	de_ = de = (struct __kernel_dirent *) malloc(bufferSize);
 	if (de == NULL)
-		return -1;
+		return -ENOMEM;
 
 
 	bytesRead = lkl_sys_getdents(fd, de, bufferSize);
 	if (bytesRead < 0) {
 		free(de);
-		return -1;
+		return bytesRead;
 	}
 
 	while (bytesRead > 0 && i < ld_dirent_count) {
@@ -378,13 +373,7 @@ int
 lklfs_rewind_dir_impl(void * cookie)
 {
 	int fd = (int) cookie;
-	int rc;
-
-	rc = lkl_sys_lseek(fd, 0,  SEEK_SET);
-	if (rc != 0)
-		return -1;
-
-	return 0;
+	return lkl_sys_lseek(fd, 0,  SEEK_SET);
 }
 
 
@@ -395,14 +384,14 @@ lklfs_open_impl(void * vol_, void * vnode_, int lhOpenMode, void ** cookie_)
 	int lklOpenMode = lh_to_lkl_openMode(lhOpenMode);
 	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
 	if (abs_path == NULL)
-		return -1;
+		return -ENOMEM;
 
 	fd = lkl_sys_open(abs_path, lklOpenMode, 0);
 		// don't need to worry about the permission bits as this
 		// will	never create new files.
 	free(abs_path);
 	if (fd < 0)
-		return -1;
+		return fd;
 
 	*cookie_ = (void*) fd;
 
@@ -416,12 +405,12 @@ lklfs_access_impl(void * vol_, void * vnode_, int accessMode)
 	int fd;
 	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
 	if (abs_path == NULL)
-		return -1;
+		return -ENOMEM;
 
 	fd = lkl_sys_access(abs_path, accessMode);
 	free(abs_path);
 	if (fd < 0)
-		return -1;
+		return fd;
 
 	return 0;
 }

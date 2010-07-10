@@ -16,6 +16,7 @@
 #define BRIDGE_HAIKU
 #include "lkl-haiku-bridge.h"
 #include "lh-fcntl.h"
+#include "lh-error.h"
 
 
 #define NIMPL 															\
@@ -81,7 +82,7 @@ lklfs_access(fs_volume* volume, fs_vnode* vnode, int mode)
 	int rc;
 	rc = lklfs_access_impl(volume->private_volume, vnode->private_node, mode);
 	if (rc != 0)
-		return B_ERROR;
+		return lh_to_haiku_error(-rc);
 
 	return B_OK;
 }
@@ -95,7 +96,7 @@ lklfs_read_stat(fs_volume* volume, fs_vnode* vnode,
 	int rc;
 	rc = lklfs_read_stat_impl(volume->private_volume, vnode->private_node, &ls);
 	if (rc != 0)
-		return B_ERROR;
+		return lh_to_haiku_error(-rc);
 
 	stat->st_mode	 = ls.st_mode;
 	stat->st_nlink	 = ls.st_nlink;
@@ -146,7 +147,7 @@ lklfs_open(fs_volume* volume, fs_vnode* vnode, int openMode,
 		// API cannot at this moment open file descriptor for symlinks.
 		dprintf("lklfs_open(%s, O_NOTRAVERSE) called. NOT Implemented yet!\n",
 			(char *) vnode->private_node);
-		return B_ERROR;
+		return B_BAD_VALUE;
 	}
 
 	if ((openMode & O_TEMPORARY) != 0) {
@@ -164,13 +165,13 @@ lklfs_open(fs_volume* volume, fs_vnode* vnode, int openMode,
 		// system add-on?
 		dprintf("lklfs_open(%s, O_TEMPORARY) called. NOT Implemented yet!\n",
 			(char *) vnode->private_node);
-		return B_ERROR;
+		return B_BAD_VALUE;
 	}
 
 	rc = lklfs_open_impl(volume->private_volume, vnode->private_node,
 		haiku_to_lh_openMode(openMode), _cookie);
 	if (rc != 0)
-		return B_ERROR;
+		return lh_to_haiku_error(-rc);
 
 	return B_OK;
 }
@@ -232,7 +233,7 @@ lklfs_open_dir(fs_volume* volume, fs_vnode* vnode,
 	int rc;
 	rc = lklfs_open_dir_impl(volume->private_volume, vnode->private_node, _cookie);
 	if (rc != 0)
-		return B_ERROR;
+		return lh_to_haiku_error(-rc);
 
 	return B_OK;
 }
@@ -243,7 +244,7 @@ lklfs_close_dir(fs_volume* volume, fs_vnode* vnode, void* cookie)
 {
 	int rc = lklfs_close_dir_impl(cookie);
 	if (rc != 0)
-		return B_ERROR;
+		return lh_to_haiku_error(-rc);
 
 	return B_OK;
 }
@@ -277,7 +278,7 @@ lklfs_read_dir(fs_volume* volume, fs_vnode* vnode, void* cookie,
 	num = lklfs_read_dir_impl(cookie, ld, bufferSize);
 	if (num < 0) {
 		free(ld);
-		return B_ERROR;
+		return lh_to_haiku_error(-num);
 	}
 
 	if (num == 0) {
@@ -317,7 +318,7 @@ lklfs_rewind_dir(fs_volume* volume, fs_vnode* vnode,
 	int rc;
 	rc = lklfs_rewind_dir_impl(cookie);
 	if (rc != 0)
-		return B_ERROR;
+		return lh_to_haiku_error(-rc);
 
 	return B_OK;
 }
