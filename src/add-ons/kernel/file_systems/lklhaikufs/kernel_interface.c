@@ -163,7 +163,7 @@ lklfs_mount(fs_volume * _volume, const char * device, uint32 flags,
 
 	_volume->ops = &gLklfsVolumeOps;
 	dprintf("lklfs_mount:: stuff succeeded\n");
-	return B_OK;
+	return B_ERROR;
 }
 
 
@@ -174,15 +174,6 @@ lklfs_get_supported_operations(partition_data * partition, uint32 mask)
 	return B_DISK_SYSTEM_SUPPORTS_INITIALIZING
 		| B_DISK_SYSTEM_SUPPORTS_CONTENT_NAME
 		| B_DISK_SYSTEM_SUPPORTS_WRITING;
-}
-
-
-static status_t
-lklfs_initialize(int fd, partition_id partitionID, const char * name,
-	const char * parameterString, off_t partitionSize, disk_job_id job)
-{
-	dprintf("[lklfs] lklfs_initialize\n");
-	return B_OK;
 }
 
 
@@ -244,7 +235,7 @@ static file_system_module_info sBeFileSystem = {
 	NULL,	// move
 	NULL,	// set_content_name
 	NULL,	// set_content_parameters
-	lklfs_initialize,
+	NULL,	// initialize
 };
 
 
