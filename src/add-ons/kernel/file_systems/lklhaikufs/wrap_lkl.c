@@ -372,3 +372,17 @@ lklfs_read_dir_impl(void * _cookie, struct lh_dirent * ld, int bufferSize)
 	return i;
 }
 
+
+int
+lklfs_rewind_dir_impl(void * cookie)
+{
+	int fd = (int) cookie;
+	int rc;
+
+	rc = lkl_sys_lseek(fd, 0,  SEEK_SET);
+	if (rc != 0)
+		return -1;
+
+	return 0;
+}
+
