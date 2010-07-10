@@ -15,6 +15,7 @@
 
 #define BRIDGE_HAIKU
 #include "lkl-haiku-bridge.h"
+#include "lh-error.h"
 
 #define NIMPL dprintf("[[%s]] called -- NOT Implemented yet!\n", __func__); return B_ERROR;
 
@@ -33,7 +34,7 @@ lklfs_read_fs_info(fs_volume* volume, struct fs_info* info)
 	int rc;
 	rc = lklfs_read_fs_info_impl(volume->private_volume, &fi);
 	if (rc != 0)
-		return B_ERROR;
+		return lh_to_haiku_error(-rc);
 
 	info->flags		   = (fi.flags & LH_FS_READONLY) ? B_FS_IS_READONLY : 0;
 	info->block_size   = fi.block_size;
