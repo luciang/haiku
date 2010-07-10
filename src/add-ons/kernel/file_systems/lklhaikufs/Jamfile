@@ -1,0 +1,89 @@
+SubDir HAIKU_TOP src add-ons kernel file_systems lklhaikufs ;
+
+UsePrivateHeaders kernel shared ;
+
+DEFINES += DEBUG_APP="\\\"lklhaikufs\\\"" ;
+
+local lklhaikuFSTop = [ FDirName $(HAIKU_TOP) src add-ons kernel
+	file_systems lklhaikufs ] ;
+local lklhaikuFSIncludes = [ PrivateHeaders lklhaikufs ] ;
+
+SubDirHdrs [ FDirName $(lklhaikuFSIncludes) shared ] ;
+SubDirSysHdrs [ FDirName $(lklhaikuFSTop) include ] ;
+
+UsePrivateKernelHeaders ;
+UsePrivateHeaders shared ;
+UsePrivateHeaders kernel ;
+
+HAIKU_LDFLAGS += --build-id=none ;
+
+local lkl_lib = [ FDirName $(HAIKU_TOP) src add-ons kernel file_systems lklhaikufs lkl lkl.a ] ;
+
+rule AddStringPrefix prefix : string_list 
+{
+	local result ;
+	for i in $(2)
+	{
+		result += $(1)/home/gringo/hack/haiku/haiku/$(i) ;
+	}
+	return $(result) ;
+}
+
+rule BuildLKL
+{
+	local headers ;
+	LKL_CROSS_CC = $(HAIKU_CC) ;
+	HERE = $(lklhaikuFSTop) ;
+	LKL_LINUX_DIR = "/home/gringo/hack/lkl/linux-2.6" ;
+	headers = [ AddStringPrefix -I : [ FStandardHeaders ] [ FStandardOSHeaders ] $(SUBDIRSYSHDRS)  $(HAIKU_CONFIG_HEADERS) ] ;
+	ENV_INC = $(headers) ;
+}
+
+actions BuildLKL
+{
+	# make sure this is an absolute path.
+	case $(HERE) in
+		 "/*") export HERE=$(HERE)
+		   ;;
+		 *) export HERE=`pwd`/$(HERE)
+		   ;;
+	esac
+
+	# create symlinks to include directories, to ease writting
+	# of applications that depend on these
+	mkdir -p $HERE/include
+	ln -sf $(LKL_LINUX_DIR)/arch/lkl/include/asm	$HERE/include/asm
+	ln -sf $(LKL_LINUX_DIR)/arch/x86		$HERE/include/x86
+	ln -sf $(LKL_LINUX_DIR)/include/asm-generic	$HERE/include/asm-generic
+	ln -sf $(LKL_LINUX_DIR)/include/linux		$HERE/include/linux
+
+
+	# remove 'gcc' from the end of the compiler line
+	#  LKL_CROSS_CC is something like '/some/path/gcc-dir/haiku-gcc'
+	#  but the Linux kernel needs something like '/some/path/gcc-dir/haiku-'
+	export LKL_CROSS_CC=$(LKL_CROSS_CC)
+	export CROSS=${LKL_CROSS_CC%%gcc}
+
+	mkdir -p $HERE/lkl
+	if [ ! -f $HERE/lkl/.config ]; then
+		cp $HERE/.config $HERE/lkl/.config
+	fi
+
+	# TODO: de-hardcode 'make'
+	export ASDF=" $(ENV_INC) "
+
+	echo "mark-begin ----------------------"
+	echo make O=$HERE/lkl ARCH=lkl CROSS_COMPILE=$CROSS LKLENV_CFLAGS="$ASDF" lkl.a
+	echo "mark-end   ----------------------"
+	cd $(LKL_LINUX_DIR) && make O=$HERE/lkl ARCH=lkl CROSS_COMPILE=$CROSS LKLENV_CFLAGS="$ASDF" lkl.a
+}
+
+
+BuildLKL $(lkl_lib) ;
+
+KernelAddon lklhaikufs
+	: kernel_interface.c
+	  wrap_lkl.c
+
+	: $(HAIKU_LIBSUPC++) $(lkl_lib)
+;
