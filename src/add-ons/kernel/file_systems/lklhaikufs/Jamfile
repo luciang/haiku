@@ -87,6 +87,7 @@ KernelAddon lklhaikufs
 	  lklfs_volume_ops.c
 	  lklfs_vnode_ops.c
 	  wrap_lkl.c
+	  util.c
 
 	: $(HAIKU_LIBSUPC++) $(lkl_lib)
 ;
