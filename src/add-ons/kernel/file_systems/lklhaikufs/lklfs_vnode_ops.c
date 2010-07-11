@@ -63,7 +63,10 @@ lklfs_put_vnode(fs_volume* volume, fs_vnode* vnode, bool reenter)
 static status_t
 lklfs_remove_vnode(fs_volume* volume, fs_vnode* vnode, bool reenter)
 {
-	NIMPL;
+	// The private_node is the full path to the file relative to the
+	// partition root.
+	free(vnode->private_node);
+	return B_OK;
 }
 
 
