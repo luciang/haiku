@@ -12,6 +12,7 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/stat.h>
+#include "util.h"
 
 #define BRIDGE_LKL
 #include "lkl-haiku-bridge.h"
@@ -44,12 +45,7 @@ static inline
 char *
 rel_to_abs_path(struct lklfs_fs_volume * vol, const char * rel_path)
 {
-	int len = strlen(vol->mnt_path) + sizeof('/') + strlen(rel_path) + sizeof('\0');
-	char * abs_path = malloc(len);
-	if (abs_path != NULL)
-		snprintf(abs_path, len, "%s/%s", vol->mnt_path, rel_path);
-
-	return abs_path;
+	return pathJoin(vol->mnt_path, rel_path);
 }
 
 /*! Create a Linux device and mount it
