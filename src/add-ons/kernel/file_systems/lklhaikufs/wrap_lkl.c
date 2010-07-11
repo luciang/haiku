@@ -410,3 +410,12 @@ lklfs_access_impl(void * vol_, void * vnode_, int accessMode)
 
 	return 0;
 }
+
+
+int
+lklfs_close_impl(void * cookie)
+{
+	// the cookie's value is the Linux file descriptor corresponding
+	// to this opened file. It's not treated as a pointer.
+	return lkl_sys_close((int) cookie);
+}

@@ -93,5 +93,6 @@ extern int lklfs_read_dir_impl(void* _cookie, struct lh_dirent* ld, int bufferSi
 extern int lklfs_rewind_dir_impl(void* cookie);
 extern int lklfs_open_impl(void* vol_, void* vnode_, int lhOpenMode, void** cookie_);
 extern int lklfs_access_impl(void* vol_, void* vnode_, int accessMode);
+extern int lklfs_close_impl(void* cookie);
 
 #endif // LKL_HAIKU_BRIDGE_H__

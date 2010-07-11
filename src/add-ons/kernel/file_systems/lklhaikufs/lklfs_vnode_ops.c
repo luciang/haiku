@@ -200,7 +200,8 @@ lklfs_open(fs_volume* volume, fs_vnode* vnode, int openMode,
 static status_t
 lklfs_close(fs_volume* volume, fs_vnode* vnode, void* cookie)
 {
-	NIMPL;
+	int rc = lklfs_close_impl(cookie);
+	return lh_to_haiku_error(-rc);
 }
 
 
@@ -208,7 +209,9 @@ static status_t
 lklfs_free_cookie(fs_volume* volume, fs_vnode* vnode,
 	void* cookie)
 {
-	NIMPL;
+	// Nothing allocated, the cookie's value is interpreted as a
+	// number: the Linux file descriptor
+	return B_OK;
 }
 
 
