@@ -447,3 +447,10 @@ lklfs_write_impl(void * cookie, lh_off_t pos, const void * buffer, lh_size_t * l
 	*length = rc;
 	return 0;
 }
+
+
+int
+lklfs_sync_impl(void)
+{
+	return lkl_sys_sync();
+}
