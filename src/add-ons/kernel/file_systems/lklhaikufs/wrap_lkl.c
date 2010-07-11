@@ -222,12 +222,12 @@ lh_ino_t
 lklfs_get_ino(void * vol_, const char * path)
 {
 	int rc;
-	struct __kernel_stat stat;
+	struct __kernel_stat64 stat;
 	char * abs_path = rel_to_abs_path(vol_, path);
 	if (abs_path == NULL)
 		return -ENOMEM;
 
-	rc = lkl_sys_newstat(abs_path, &stat);
+	rc = lkl_sys_stat64(abs_path, &stat);
 	free(abs_path);
 	if (rc < 0) {
 		dprintf("lklfs_get_ino:: cannot stat [%s], rc=%d\n", abs_path, rc);
@@ -268,12 +268,12 @@ int
 lklfs_read_stat_impl(void * vol_, void * vnode_, struct lh_stat * ls)
 {
 	int rc;
-	struct __kernel_stat stat;
+	struct __kernel_stat64 stat;
 	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
 	if (abs_path == NULL)
 		return -ENOMEM;
 
-	rc = lkl_sys_newstat(abs_path, &stat);
+	rc = lkl_sys_stat64(abs_path, &stat);
 	free(abs_path);
 	if (rc != 0)
 		return rc;
