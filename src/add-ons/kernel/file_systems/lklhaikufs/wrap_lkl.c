@@ -419,3 +419,31 @@ lklfs_close_impl(void * cookie)
 	// to this opened file. It's not treated as a pointer.
 	return lkl_sys_close((int) cookie);
 }
+
+
+int
+lklfs_read_impl(void * cookie, lh_off_t pos, void * buffer, lh_size_t * length)
+{
+	int rc;
+	int fd = (int) cookie;
+	rc = lkl_sys_pread64(fd, buffer, *length, pos);
+	if (rc < 0)
+		return rc;
+
+	*length = rc;
+	return 0;
+}
+
+
+int
+lklfs_write_impl(void * cookie, lh_off_t pos, const void * buffer, lh_size_t * length)
+{
+	int rc;
+	int fd = (int) cookie;
+	rc = lkl_sys_pwrite64(fd, buffer, *length, pos);
+	if (rc < 0)
+		return rc;
+
+	*length = rc;
+	return 0;
+}

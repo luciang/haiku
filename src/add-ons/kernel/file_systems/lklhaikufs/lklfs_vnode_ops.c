@@ -222,7 +222,22 @@ static status_t
 lklfs_read(fs_volume* volume, fs_vnode* vnode, void* cookie,
 	off_t pos, void* buffer, size_t* length)
 {
-	NIMPL;
+	void* kernBuff;
+	int rc;
+
+	if (buffer == NULL || length == NULL || pos < 0)
+		return B_BAD_VALUE;
+
+	kernBuff = malloc(*length);
+	if (kernBuff == NULL)
+		return B_NO_MEMORY;
+
+	rc = lklfs_read_impl(cookie, pos, kernBuff, length);
+
+	memcpy(buffer, kernBuff, *length);
+	free(kernBuff);
+
+	return lh_to_haiku_error(-rc);
 }
 
 
@@ -230,7 +245,21 @@ static status_t
 lklfs_write(fs_volume* volume, fs_vnode* vnode, void* cookie,
 	off_t pos, const void* buffer, size_t* length)
 {
-	NIMPL;
+	void* kernBuff;
+	int rc;
+
+	if (buffer == NULL || length == NULL || pos < 0)
+		return B_BAD_VALUE;
+
+	kernBuff = malloc(*length);
+	if (kernBuff == NULL)
+		return B_NO_MEMORY;
+
+	memcpy(kernBuff, buffer, *length);
+	rc = lklfs_write_impl(cookie, pos, kernBuff, length);
+	free(kernBuff);
+
+	return lh_to_haiku_error(-rc);
 }
 
 
