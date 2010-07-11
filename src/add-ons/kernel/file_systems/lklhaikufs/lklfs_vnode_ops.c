@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <posix/dirent.h>
-
+#include "util.h"
 
 #define BRIDGE_HAIKU
 #include "lkl-haiku-bridge.h"
@@ -26,10 +26,30 @@
 	} while(0)
 
 
+
+extern status_t get_vnode_set_private_node(fs_volume* volume, ino_t vnodeID, void* privateNode);
+
 static status_t lklfs_lookup(fs_volume* volume, fs_vnode* dir,
 	const char* name,  ino_t* _id)
 {
-	NIMPL;
+	ino_t ino;
+	char * filePath = pathJoin(dir->private_node, name);
+	if (filePath == NULL)
+		return B_NO_MEMORY;
+
+	ino = lklfs_get_ino(volume->private_volume, filePath);
+	if (ino < 0)
+		return lh_to_haiku_error(-ino);
+
+	*_id = ino;
+
+	// TODO: FIXME: get_vnode + the get_vnode hook do not permit
+	// us to put the file path into the fs_vnode->private_node field.
+	// get_vnode_set_private_node is a new function exported that
+	// permits setting the private_node field in a safe manner.
+
+	// return get_vnode(volume, ino, &private_node);
+	return get_vnode_set_private_node(volume, ino, filePath);
 }
 
 
