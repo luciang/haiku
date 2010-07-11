@@ -1101,6 +1101,10 @@ create_special_sub_node(struct vnode* vnode, uint32 flags)
 }
 
 
+static status_t
+get_vnode(dev_t mountID, ino_t vnodeID, struct vnode** _vnode, bool canWait,
+	int reenter, void* privateNode);
+
 /*!	\brief Retrieves a vnode for a given mount ID, node ID pair.
 
 	If the node is not yet in memory, it will be loaded.
@@ -1118,6 +1122,13 @@ create_special_sub_node(struct vnode* vnode, uint32 flags)
 static status_t
 get_vnode(dev_t mountID, ino_t vnodeID, struct vnode** _vnode, bool canWait,
 	int reenter)
+{
+	return get_vnode(mountID, vnodeID, _vnode, canWait, reenter, NULL);
+}
+
+static status_t
+get_vnode(dev_t mountID, ino_t vnodeID, struct vnode** _vnode, bool canWait,
+	int reenter, void* privateNode)
 {
 	FUNCTION(("get_vnode: mountid %ld vnid 0x%Lx %p\n", mountID, vnodeID,
 		_vnode));
@@ -1177,6 +1188,7 @@ restart:
 
 		int type;
 		uint32 flags;
+		vnode->private_node = privateNode;
 		status = FS_MOUNT_CALL(vnode->mount, get_vnode, vnodeID, vnode, &type,
 			&flags, reenter);
 		if (status == B_OK && vnode->private_node == NULL)
@@ -3772,6 +3784,45 @@ get_vnode(fs_volume* volume, ino_t vnodeID, void** _privateNode)
 			*_privateNode = resolvedNode.private_node;
 	} else if (_privateNode != NULL)
 		*_privateNode = vnode->private_node;
+
+	return B_OK;
+}
+
+
+extern "C" status_t
+get_vnode_set_private_node(fs_volume* volume, ino_t vnodeID, void* privateNode)
+{
+	struct vnode* vnode;
+
+	if (volume == NULL)
+		return B_BAD_VALUE;
+
+	status_t status = get_vnode(volume->id, vnodeID, &vnode, true, true, privateNode);
+	if (status != B_OK)
+		return status;
+
+	/*
+	 * TODO: FIXME: this implementation of get_vnode() does not
+	 * consider layered FS.
+	 */
+
+	/*
+	// If this is a layered FS, we need to get the node cookie for the requested
+	// layer.
+	if (HAS_FS_CALL(vnode, get_super_vnode)) {
+		fs_vnode resolvedNode;
+		status_t status = FS_CALL(vnode, get_super_vnode, volume,
+			&resolvedNode);
+		if (status != B_OK) {
+			panic("get_vnode(): Failed to get super node for vnode %p, "
+				"volume: %p", vnode, volume);
+			put_vnode(vnode);
+			return status;
+		}
+
+		resolvedNode.private_node = privateNode;
+	}
+	*/
 
 	return B_OK;
 }
