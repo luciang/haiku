@@ -19,6 +19,9 @@
 
 #define NIMPL dprintf("[[%s]] called -- NOT Implemented yet!\n", __func__); return B_ERROR;
 
+// defined in lklfs_vnode_ops.c
+extern fs_vnode_ops lklfs_vnode_ops;
+
 
 static status_t
 lklfs_unmount(fs_volume * _volume)
@@ -53,7 +56,8 @@ static status_t
 lklfs_get_vnode(fs_volume * volume, ino_t id,
 	fs_vnode * vnode, int * _type, uint32 * _flags, bool reenter)
 {
-	NIMPL;
+	vnode->ops = &lklfs_vnode_ops;
+	return B_OK;
 }
 
 
