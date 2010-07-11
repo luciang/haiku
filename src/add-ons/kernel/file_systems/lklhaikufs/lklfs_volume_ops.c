@@ -68,9 +68,11 @@ lklfs_write_fs_info(fs_volume * volume, const struct fs_info * info, uint32 mask
 }
 
 
-static status_t lklfs_sync(fs_volume * volume)
+static status_t
+lklfs_sync(fs_volume * volume)
 {
-	NIMPL;
+	int rc = lklfs_sync_impl();
+	return lh_to_haiku_error(-rc);
 }
 
 
