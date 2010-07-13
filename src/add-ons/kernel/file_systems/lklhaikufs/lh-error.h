@@ -78,7 +78,7 @@ DEF_ASSERT_ERROR(EPIPE);
 #ifdef BRIDGE_HAIKU
 
 static status_t
-lh_to_haiku_error(int err)
+lh_to_haiku_error_x(int err)
 {
 	switch(err)
 	{
@@ -110,6 +110,17 @@ lh_to_haiku_error(int err)
 	default:				return B_ERROR;
 	}
 }
+
+static status_t
+lh_to_haiku_error(int err)
+{
+	status_t herr = lh_to_haiku_error_x(err);
+	if (herr != B_OK) {
+		dprintf("lklfs:: error rc=%d err=%s\n", (int) herr, strerror(herr));
+	}
+	return herr;
+}
+
 
 #endif // BRIDGE_HAIKU
 

@@ -275,8 +275,10 @@ lklfs_read_stat_impl(void * vol_, void * vnode_, struct lh_stat * ls)
 
 	rc = lkl_sys_stat64(abs_path, &stat);
 	free(abs_path);
-	if (rc != 0)
+	if (rc != 0) {
+		dprintf("lkl_sys_stat64:: rc=%d\n");
 		return rc;
+	}
 
 	ls->st_mode		  = stat.st_mode;
 	ls->st_nlink	  = stat.st_nlink;
