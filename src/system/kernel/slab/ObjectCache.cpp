@@ -202,6 +202,16 @@ ObjectCache::ReturnObjectToSlab(slab* source, void* object, uint32 flags)
 	}
 
 	ParanoiaChecker _(source);
+	uint8* data = (uint8*) object;
+	if (data < source->pages
+		|| data >= (uint8*) source->pages + source->size * object_size) {
+		panic("object_cache: free'd object does not belong to slab");
+	}
+
+	intptr_t objectOffset = data - source->offset - (uint8*) source->pages;
+	if (objectOffset % object_size != 0) {
+		panic("object_cache: returning a wrong pointer to a slab object");
+	}
 
 	object_link* link = object_to_link(object, object_size);
 
