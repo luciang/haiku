@@ -24,15 +24,21 @@ extern file_system_module_info lklfs_file_system_info;
 
 status_t lklfs_std_ops(int32 op, ...);
 
+extern sem_id lklfs_vnode_sem;
+
 status_t
 lklfs_std_ops(int32 op, ...)
 {
 	switch (op) {
 	case B_MODULE_INIT:
+		lklfs_vnode_sem = create_sem(1, "lklfs-vnode-path-protector");
+		if (lklfs_vnode_sem < B_OK)
+			return lklfs_vnode_sem;
 		lkl_env_init(LKL_MEMORY_SIZE);
 		return B_OK;
 	case B_MODULE_UNINIT:
 		lkl_env_fini();
+		delete_sem(lklfs_vnode_sem);
 		return B_OK;
 	default:
 		return B_ERROR;

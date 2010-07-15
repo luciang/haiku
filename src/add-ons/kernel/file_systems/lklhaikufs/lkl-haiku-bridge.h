@@ -44,6 +44,21 @@ typedef struct lklfs_partition_id {
 } lklfs_partition_id;
 
 
+
+
+typedef struct lklfs_vnode {
+	struct lklfs_vnode* parent;
+	char* name;
+} lklfs_vnode;
+
+
+extern lklfs_vnode* lklfs_vnode_create(lklfs_vnode* parent, const char* name);
+extern lklfs_vnode* lklfs_vnode_create_root_vnode(void);
+extern void lklfs_vnode_free(lklfs_vnode* vnode);
+extern char* vnode_full_path(lklfs_vnode* node);
+
+
+
 // lh_fs_info.flags
 #define LH_FS_READONLY 0x01
 
@@ -84,15 +99,15 @@ struct lh_dirent {
 extern int lklfs_identify_partition_impl(int fd, lh_off_t size, void** _cookie);
 extern void* lklfs_mount_impl(int fd, lh_off_t size, int readonly);
 extern int lklfs_umount_impl(void* vol_);
-extern lh_ino_t lklfs_get_ino(void* vol_, const char* path);
+extern lh_ino_t lklfs_get_ino(void* vol_, lklfs_vnode* vnode);
 extern int lklfs_read_fs_info_impl(void* vol_, struct lh_fs_info* fi);
-extern int lklfs_read_stat_impl(void* vol_, void* vnode_, struct lh_stat* ls);
-extern int lklfs_open_dir_impl(void* vol_, void* vnode_, void** _cookie);
+extern int lklfs_read_stat_impl(void* vol_, lklfs_vnode* vnode, struct lh_stat* ls);
+extern int lklfs_open_dir_impl(void* vol_, lklfs_vnode* vnode, void** _cookie);
 extern int lklfs_close_dir_impl(void* _cookie);
 extern int lklfs_read_dir_impl(void* _cookie, struct lh_dirent* ld, int bufferSize);
 extern int lklfs_rewind_dir_impl(void* cookie);
-extern int lklfs_open_impl(void* vol_, void* vnode_, int lhOpenMode, void** cookie_);
-extern int lklfs_access_impl(void* vol_, void* vnode_, int accessMode);
+extern int lklfs_open_impl(void* vol_, lklfs_vnode* vnode, int lhOpenMode, void** cookie_);
+extern int lklfs_access_impl(void* vol_, lklfs_vnode* vnode, int accessMode);
 extern int lklfs_close_impl(void* cookie);
 extern int lklfs_read_impl(void* cookie, lh_off_t pos, void* buffer, lh_size_t* length);
 extern int lklfs_write_impl(void* cookie, lh_off_t pos, const void* buffer, lh_size_t* length);

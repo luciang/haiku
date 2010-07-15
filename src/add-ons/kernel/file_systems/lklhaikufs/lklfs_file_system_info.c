@@ -81,15 +81,21 @@ lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 	int open_flags = O_NOCACHE;
 	int readonly = (flags & B_MOUNT_READ_ONLY) != 0;
 	struct stat st;
+	lklfs_vnode* root_vnode = lklfs_vnode_create_root_vnode();
+	if (root_vnode == NULL)
+		return B_NO_MEMORY;
 
 	open_flags |= readonly ? O_RDONLY : O_RDWR;
 	fd = open(device, O_NOCACHE | open_flags);
-	if (fd < B_OK)
+	if (fd < B_OK) {
+		lklfs_vnode_free(root_vnode);
 		return fd;
+	}
 
 	rc = _kern_read_stat(fd, NULL, 0, &st, sizeof(struct stat));
 	if (rc != B_OK) {
 		close(fd);
+		lklfs_vnode_free(root_vnode);
 		return rc;
 	}
 
@@ -97,17 +103,17 @@ lklfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 	_volume->private_volume = lklfs_mount_impl(fd, st.st_size, readonly);
 	if (_volume->private_volume == NULL) {
 		close(fd);
+		lklfs_vnode_free(root_vnode);
 		return B_ERROR;
 	}
 
-	*_rootID = lklfs_get_ino(_volume->private_volume, "/");
-	// the private_vnode field of a vnode will be the relative path
-	// of that vnode inside this instance of the file system.
-	rc = publish_vnode(_volume, *_rootID, (void*)strdup("/"),
+	*_rootID = lklfs_get_ino(_volume->private_volume, root_vnode);
+	rc = publish_vnode(_volume, *_rootID, root_vnode,
 		&lklfs_vnode_ops, S_IFDIR, 0);
 	if (rc < B_OK) {
 		// TODO: FIXME: umount?
 		close(fd);
+		lklfs_vnode_free(root_vnode);
 		return rc;
 	}
 

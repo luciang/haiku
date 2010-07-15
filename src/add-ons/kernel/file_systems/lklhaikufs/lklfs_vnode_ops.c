@@ -10,6 +10,7 @@
 #include <KernelExport.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <posix/dirent.h>
 #include "util.h"
 
@@ -29,17 +30,93 @@
 
 extern status_t get_vnode_set_private_node(fs_volume* volume, ino_t vnodeID, void* privateNode);
 
+
+
+
+// used in renames and other ways
+sem_id lklfs_vnode_sem;
+
+lklfs_vnode*
+lklfs_vnode_create_root_vnode()
+{
+	lklfs_vnode* ret = malloc(sizeof(lklfs_vnode));
+	if (ret == NULL)
+		return NULL;
+	ret->parent = NULL;
+	ret->name = strdup("/"); // root
+	return ret;
+}
+
+
+lklfs_vnode*
+lklfs_vnode_create(lklfs_vnode* parent, const char* name)
+{
+	lklfs_vnode* ret = malloc(sizeof(lklfs_vnode));
+	if (ret == NULL)
+		return NULL;
+	ret->parent = parent;
+	ret->name = strdup(name);
+	return ret;
+}
+
+
+void
+lklfs_vnode_free(lklfs_vnode* vnode)
+{
+	free(vnode->name);
+	free(vnode);
+}
+
+
+char*
+vnode_full_path(lklfs_vnode* node)
+{
+	static char buf1[B_PATH_NAME_LENGTH];
+	static char buf2[sizeof(buf1)];
+	char *p1 = buf1, *p2 = buf2;
+	char* ret = NULL;
+
+	if (acquire_sem(lklfs_vnode_sem) != B_OK)
+		return NULL;
+
+	snprintf(p1, sizeof(buf1), "%s", node->name);
+	node = node->parent;
+	while (node != NULL) {
+		snprintf(p2, sizeof(buf1), "%s/%s", node->name, p1);
+		node = node->parent;
+
+		{
+			char* swap;
+			swap = p1;
+			p1 = p2;
+			p2 = swap;
+		}
+	}
+	ret = strdup(p1);
+
+	if (release_sem_etc(lklfs_vnode_sem, 1, B_DO_NOT_RESCHEDULE) != B_OK) {
+		free(ret);
+		return NULL;
+	}
+
+	return ret;
+}
+
+
+
 static status_t lklfs_lookup(fs_volume* volume, fs_vnode* dir,
 	const char* name,  ino_t* _id)
 {
 	ino_t ino;
-	char * filePath = pathJoin(dir->private_node, name);
-	if (filePath == NULL)
+	lklfs_vnode* fileVnode = lklfs_vnode_create(dir->private_node, name);
+	if (fileVnode == NULL)
 		return B_NO_MEMORY;
 
-	ino = lklfs_get_ino(volume->private_volume, filePath);
-	if (ino < 0)
+	ino = lklfs_get_ino(volume->private_volume, fileVnode);
+	if (ino < 0) {
+		lklfs_vnode_free(fileVnode);
 		return lh_to_haiku_error(-ino);
+	}
 
 	*_id = ino;
 
@@ -49,7 +126,7 @@ static status_t lklfs_lookup(fs_volume* volume, fs_vnode* dir,
 	// permits setting the private_node field in a safe manner.
 
 	// return get_vnode(volume, ino, &private_node);
-	return get_vnode_set_private_node(volume, ino, filePath);
+	return get_vnode_set_private_node(volume, ino, fileVnode);
 }
 
 
@@ -65,7 +142,7 @@ lklfs_remove_vnode(fs_volume* volume, fs_vnode* vnode, bool reenter)
 {
 	// The private_node is the full path to the file relative to the
 	// partition root.
-	free(vnode->private_node);
+	lklfs_vnode_free(vnode->private_node);
 	return B_OK;
 }
 

@@ -41,12 +41,20 @@ typedef struct lklfs_fs_volume {
 } lklfs_fs_volume;
 
 
-static inline
-char *
-rel_to_abs_path(struct lklfs_fs_volume * vol, const char * rel_path)
+
+static char*
+vnode_to_abs_path(struct lklfs_fs_volume * vol, lklfs_vnode* vnode)
 {
-	return pathJoin(vol->mnt_path, rel_path);
+	char* rel_path;
+	char* abs_path;
+	rel_path = vnode_full_path(vnode);
+	if (rel_path == NULL)
+		return NULL;
+	abs_path = pathJoin(vol->mnt_path, rel_path);
+	free(rel_path);
+	return abs_path;
 }
+
 
 /*! Create a Linux device and mount it
 
@@ -219,11 +227,11 @@ lklfs_umount_impl(void * vol_)
 // Returns the inode corresponding to @path, relative to @vol_'s  mount point.
 // Returns -1 on error.
 lh_ino_t
-lklfs_get_ino(void * vol_, const char * path)
+lklfs_get_ino(void * vol_, lklfs_vnode* vnode)
 {
 	int rc;
 	struct __kernel_stat64 stat;
-	char * abs_path = rel_to_abs_path(vol_, path);
+	char * abs_path = vnode_to_abs_path(vol_, vnode);
 	if (abs_path == NULL)
 		return -ENOMEM;
 
@@ -265,11 +273,11 @@ lklfs_read_fs_info_impl(void * vol_, struct lh_fs_info * fi)
 
 
 int
-lklfs_read_stat_impl(void * vol_, void * vnode_, struct lh_stat * ls)
+lklfs_read_stat_impl(void * vol_, lklfs_vnode* vnode, struct lh_stat * ls)
 {
 	int rc;
 	struct __kernel_stat64 stat;
-	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
+	char * abs_path = vnode_to_abs_path(vol_, vnode);
 	if (abs_path == NULL)
 		return -ENOMEM;
 
@@ -302,9 +310,9 @@ lklfs_read_stat_impl(void * vol_, void * vnode_, struct lh_stat * ls)
 
 
 int
-lklfs_open_dir_impl(void * vol_, void * vnode_, void ** _cookie)
+lklfs_open_dir_impl(void * vol_, lklfs_vnode* vnode, void ** _cookie)
 {
-	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
+	char * abs_path = vnode_to_abs_path(vol_, vnode);
 	if (abs_path == NULL)
 		return -1;
 
@@ -376,11 +384,11 @@ lklfs_rewind_dir_impl(void * cookie)
 
 
 int
-lklfs_open_impl(void * vol_, void * vnode_, int lhOpenMode, void ** cookie_)
+lklfs_open_impl(void * vol_, lklfs_vnode* vnode, int lhOpenMode, void ** cookie_)
 {
 	int fd;
 	int lklOpenMode = lh_to_lkl_openMode(lhOpenMode);
-	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
+	char * abs_path = vnode_to_abs_path(vol_, vnode);
 	if (abs_path == NULL)
 		return -ENOMEM;
 
@@ -398,10 +406,10 @@ lklfs_open_impl(void * vol_, void * vnode_, int lhOpenMode, void ** cookie_)
 
 
 int
-lklfs_access_impl(void * vol_, void * vnode_, int accessMode)
+lklfs_access_impl(void * vol_, lklfs_vnode* vnode, int accessMode)
 {
 	int fd;
-	char * abs_path = rel_to_abs_path(vol_, (char *) vnode_);
+	char * abs_path = vnode_to_abs_path(vol_, vnode);
 	if (abs_path == NULL)
 		return -ENOMEM;
 
