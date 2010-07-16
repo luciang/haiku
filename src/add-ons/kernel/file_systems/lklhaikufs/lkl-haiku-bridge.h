@@ -112,5 +112,6 @@ extern int lklfs_close_impl(void* cookie);
 extern int lklfs_read_impl(void* cookie, lh_off_t pos, void* buffer, lh_size_t* length);
 extern int lklfs_write_impl(void* cookie, lh_off_t pos, const void* buffer, lh_size_t* length);
 extern int lklfs_sync_impl(void);
+extern int lklfs_get_mode(void* vol_, lklfs_vnode* vnode, int* _type);
 
 #endif // LKL_HAIKU_BRIDGE_H__

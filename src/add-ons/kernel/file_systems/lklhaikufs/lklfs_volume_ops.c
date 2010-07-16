@@ -56,6 +56,10 @@ static status_t
 lklfs_get_vnode(fs_volume* volume, ino_t id,
 	fs_vnode* vnode, int* _type, uint32* _flags, bool reenter)
 {
+	int rc = lklfs_get_mode(volume->private_volume, vnode->private_node, _type);
+	if (rc != 0)
+		return lh_to_haiku_error(-rc);
+
 	vnode->ops = &lklfs_vnode_ops;
 	return B_OK;
 }

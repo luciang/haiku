@@ -464,3 +464,20 @@ lklfs_sync_impl(void)
 {
 	return lkl_sys_sync();
 }
+
+
+int
+lklfs_get_mode(void* vol_, lklfs_vnode* vnode, int* _type)
+{
+	int rc;
+	struct __kernel_stat64 stat;
+	char* abs_path = vnode_to_abs_path((struct lklfs_fs_volume*) vol_, vnode);
+	if (abs_path == NULL)
+		return -ENOMEM;
+
+	rc = lkl_sys_stat64(abs_path, &stat);
+	free(abs_path);
+	if (rc == 0)
+		*_type = stat.st_mode;
+	return 0;
+}
