@@ -63,8 +63,9 @@ lklfs_vnode_create(lklfs_vnode* parent, const char* name)
 void
 lklfs_vnode_free(lklfs_vnode* vnode)
 {
-	free(vnode->name);
-	free(vnode);
+	//free(vnode->name);
+	//vnode->name = 0x4;
+	//free(vnode);
 }
 
 
