@@ -384,7 +384,7 @@ lklfs_rewind_dir_impl(void * cookie)
 
 
 int
-lklfs_open_impl(void * vol_, lklfs_vnode* vnode, int lhOpenMode, void ** cookie_)
+lklfs_open_impl(void * vol_, lklfs_vnode* vnode, int lhOpenMode, int mode, void ** cookie_)
 {
 	int fd;
 	int lklOpenMode = lh_to_lkl_openMode(lhOpenMode);
@@ -392,7 +392,7 @@ lklfs_open_impl(void * vol_, lklfs_vnode* vnode, int lhOpenMode, void ** cookie_
 	if (abs_path == NULL)
 		return -ENOMEM;
 
-	fd = lkl_sys_open(abs_path, lklOpenMode, 0);
+	fd = lkl_sys_open(abs_path, lklOpenMode, mode);
 		// don't need to worry about the permission bits as this
 		// will	never create new files.
 	free(abs_path);

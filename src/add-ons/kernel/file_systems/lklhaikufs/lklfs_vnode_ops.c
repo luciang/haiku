@@ -232,7 +232,12 @@ static status_t
 lklfs_create(fs_volume* volume, fs_vnode* dir, const char* name,
 	int openMode, int perms, void** _cookie, ino_t* _newVnodeID)
 {
-	NIMPL;
+	int rc = lklfs_open_impl(volume->private_volume, dir->private_node,
+		haiku_to_lh_openMode(openMode | O_CREAT), perms, _cookie);
+	if (rc != 0)
+		return lh_to_haiku_error(-rc);
+
+	return lklfs_lookup(volume, dir, name,  _newVnodeID);
 }
 
 
@@ -270,7 +275,7 @@ lklfs_open(fs_volume* volume, fs_vnode* vnode, int openMode,
 	}
 
 	rc = lklfs_open_impl(volume->private_volume, vnode->private_node,
-		haiku_to_lh_openMode(openMode), _cookie);
+		haiku_to_lh_openMode(openMode), 0, _cookie);
 	if (rc != 0)
 		return lh_to_haiku_error(-rc);
 

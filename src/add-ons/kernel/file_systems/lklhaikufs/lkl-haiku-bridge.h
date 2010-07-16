@@ -106,7 +106,7 @@ extern int lklfs_open_dir_impl(void* vol_, lklfs_vnode* vnode, void** _cookie);
 extern int lklfs_close_dir_impl(void* _cookie);
 extern int lklfs_read_dir_impl(void* _cookie, struct lh_dirent* ld, int bufferSize);
 extern int lklfs_rewind_dir_impl(void* cookie);
-extern int lklfs_open_impl(void* vol_, lklfs_vnode* vnode, int lhOpenMode, void** cookie_);
+extern int lklfs_open_impl(void* vol_, lklfs_vnode* vnode, int lhOpenMode, int mode, void** cookie_);
 extern int lklfs_access_impl(void* vol_, lklfs_vnode* vnode, int accessMode);
 extern int lklfs_close_impl(void* cookie);
 extern int lklfs_read_impl(void* cookie, lh_off_t pos, void* buffer, lh_size_t* length);
