@@ -404,16 +404,22 @@ lklfs_read_dir(fs_volume* volume, fs_vnode* vnode, void* cookie,
 	struct dirent* buffer, size_t bufferSize, uint32* pnum)
 {
 	int i, num;
-	struct lh_dirent * ld;
+	struct lh_dirent* ld, * ld_;
 	size_t remaining = bufferSize;
 
 	// we allocate a similarly sized buffer in which we read the only
-	// info we're interested in from the Linux kernel
-	ld = (struct lh_dirent *) malloc(bufferSize);
+	// info we're interested in from the Linux kernel.
+
+	// The smallest LKL __kernel_dirent is about 3 times smaller than
+	// the smallest Haiku one (67 bytes vs. 195). Sending a buffer
+	// bigger than this can lead to situations in which the lkl
+	// getdents implementation reads too many directory entries and we
+	// cannot store them in the Haiku buffer.
+	ld_ = ld = (struct lh_dirent*)malloc(bufferSize / 3);
 	if (ld == NULL)
 		return B_NO_MEMORY;
 
-	num = lklfs_read_dir_impl(cookie, ld, bufferSize);
+	num = lklfs_read_dir_impl(cookie, ld, bufferSize / 3);
 	if (num < 0) {
 		free(ld);
 		return lh_to_haiku_error(-num);
@@ -426,25 +432,24 @@ lklfs_read_dir(fs_volume* volume, fs_vnode* vnode, void* cookie,
 	}
 
 
-
-	for(i = 0; (i < num) && (remaining > 0); i++) {
+	for(i = 0; (i < num) && (remaining > ld->d_reclen); i++) {
 		// TODO: check for nodes that are mount points for other volumes
 		// If one dentry is a mount point for another volume, I think
 		// we must return the dev_t corresponding to the other volume.
 		buffer->d_dev = volume->id;
-		buffer->d_ino = ld[i].d_ino;
+		buffer->d_ino = ld->d_ino;
 
 		// space for '\0' is aleady allocated in 'dirent':
 		// the last field is 'char d_name [1]'.
-		buffer->d_reclen = sizeof(struct dirent) + strlen(ld[i].d_name);
-		strncpy((char *) &buffer->d_name, ld[i].d_name, remaining);
+		buffer->d_reclen = sizeof(struct dirent) + strlen(ld->d_name);
+		memcpy((char *) &buffer->d_name, ld->d_name, strlen(ld->d_name) + 1);
 		remaining -= buffer->d_reclen;
-		buffer = (struct dirent *) ((char *) buffer + buffer->d_reclen);
+		buffer = (struct dirent *) ((char *)buffer + buffer->d_reclen);
+		ld = (struct lh_dirent*) ((uint8*)ld + ld->d_reclen);
 	}
 
 	*pnum = i;
-
-	free(ld);
+	free(ld_);
 	return B_OK;
 }
 

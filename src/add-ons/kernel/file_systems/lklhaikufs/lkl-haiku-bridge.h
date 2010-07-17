@@ -93,7 +93,8 @@ struct lh_stat {
 
 struct lh_dirent {
 	lh_ino_t d_ino;
-	char d_name[256];
+	unsigned short d_reclen;
+	char d_name[];
 };
 
 extern int lklfs_identify_partition_impl(int fd, lh_off_t size, void** _cookie);

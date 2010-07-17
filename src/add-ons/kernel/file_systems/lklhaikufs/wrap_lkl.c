@@ -340,13 +340,10 @@ lklfs_read_dir_impl(void * _cookie, struct lh_dirent * ld, int bufferSize)
 {
 	int bytesRead;
 	int fd = (int) _cookie;
-	int ld_dirent_count = bufferSize / sizeof(struct lh_dirent);
 	int i = 0;
+	int total_reclen = 0;
 	struct __kernel_dirent * de, * de_;
 
-
-	if (ld_dirent_count == 0)
-		return -1;
 
 	// save a backup copy of the pointer for free()
 	de_ = de = (struct __kernel_dirent *) malloc(bufferSize);
@@ -360,12 +357,17 @@ lklfs_read_dir_impl(void * _cookie, struct lh_dirent * ld, int bufferSize)
 		return bytesRead;
 	}
 
-	while (bytesRead > 0 && i < ld_dirent_count) {
+	total_reclen = 0;
+	while (bytesRead > 0 && total_reclen < bufferSize) {
+		unsigned short lh_reclen = sizeof(struct lh_dirent) + strlen(de->d_name) + 1;
+		total_reclen += lh_reclen;
 		bytesRead -= de->d_reclen;
-		ld[i].d_ino = de->d_ino;
-		ld[i].d_name[0] = '\0';
-		strncat(ld[i].d_name, de->d_name, sizeof(ld[i].d_name) - 1);
+
+		ld->d_ino = de->d_ino;
+		ld->d_reclen = lh_reclen;
+		memcpy(ld->d_name, de->d_name, strlen(de->d_name) + 1);
 		de = (struct __kernel_dirent *) ((char *) de + de->d_reclen);
+		ld = (struct lh_dirent*) ((char*)ld + ld->d_reclen);
 		i++;
 	}
 
