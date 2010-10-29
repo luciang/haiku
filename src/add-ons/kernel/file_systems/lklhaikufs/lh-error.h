@@ -112,15 +112,17 @@ lh_to_haiku_error_x(int err)
 }
 
 static status_t
-lh_to_haiku_error(int err)
+lh_to_haiku_error_str(int err, const char* func)
 {
 	status_t herr = lh_to_haiku_error_x(err);
 	if (herr != B_OK) {
-		dprintf("lklfs:: error rc=%d err=%s\n", (int) herr, strerror(herr));
+		dprintf("lklfs:: %s error rc=%d err=%s\n", func, (int) herr, strerror(herr));
 	}
 	return herr;
 }
 
+
+#define lh_to_haiku_error(err)		   lh_to_haiku_error_str(err, __func__)
 
 #endif // BRIDGE_HAIKU
 

@@ -232,12 +232,14 @@ static status_t
 lklfs_create(fs_volume* volume, fs_vnode* dir, const char* name,
 	int openMode, int perms, void** _cookie, ino_t* _newVnodeID)
 {
-	int rc = lklfs_open_impl(volume->private_volume, dir->private_node,
-		haiku_to_lh_openMode(openMode | O_CREAT), perms, _cookie);
-	if (rc != 0)
+	int rc = lklfs_create_impl(volume->private_volume, dir->private_node,
+		name, haiku_to_lh_openMode(openMode), perms, _cookie);
+	if (rc != 0) {
+		//dprintf("lklfs_create_impl returned rc=%d\n", rc);
 		return lh_to_haiku_error(-rc);
+	}
 
-	return lklfs_lookup(volume, dir, name,  _newVnodeID);
+	return lklfs_lookup(volume, dir, name, _newVnodeID);
 }
 
 
@@ -339,6 +341,7 @@ lklfs_write(fs_volume* volume, fs_vnode* vnode, void* cookie,
 		return B_NO_MEMORY;
 
 	memcpy(kernBuff, buffer, *length);
+	dprintf("lklfs_write cookie(=fd)=%d pos=%d *length=%d\n", (int)cookie, (int)pos, (int)*length);
 	rc = lklfs_write_impl(cookie, pos, kernBuff, length);
 	free(kernBuff);
 

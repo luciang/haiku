@@ -397,12 +397,50 @@ lklfs_open_impl(void * vol_, lklfs_vnode* vnode, int lhOpenMode, int mode, void 
 	fd = lkl_sys_open(abs_path, lklOpenMode, mode);
 		// don't need to worry about the permission bits as this
 		// will	never create new files.
-	free(abs_path);
-	if (fd < 0)
+	free(abs_path); // TODO: FIXME
+	if (fd < 0) {
+		//dprintf("lklfs_open_impl(%s):: fd=%d\n", abs_path, fd);
 		return fd;
+	}
 
 	*cookie_ = (void*) fd;
 
+	return 0;
+}
+
+
+int
+lklfs_create_impl(void * vol_, lklfs_vnode* dir, const char* name,
+	int lhOpenMode, int perms, void ** cookie_)
+{
+	int fd;
+	int lklOpenMode = lh_to_lkl_openMode(lhOpenMode) | O_CREAT;
+	char* dir_path = vnode_to_abs_path(vol_, dir);
+	if (dir_path == NULL)
+		return -ENOMEM;
+
+	lh_size_t len = strlen(dir_path) + strlen(name) + 2;
+	char* file_path = malloc(len);
+	if (file_path == NULL) {
+		free(dir_path);
+		return -ENOMEM;
+	}
+
+	snprintf(file_path, len, "%s/%s", dir_path, name);
+	free(dir_path);
+
+	//dprintf("lklfs_create_impl(%s) lklOpenMode=%d perms=%d\n", file_path, lklOpenMode, perms);
+	fd = lkl_sys_open(file_path, lklOpenMode, perms);
+		// don't need to worry about the permission bits as this
+		// will	never create new files.
+	free(file_path); // TODO: FIXME
+	if (fd < 0) {
+		//dprintf("lklfs_create_impl(%s):: fd=%d\n", file_path, fd);
+		return fd;
+	}
+
+	*cookie_ = (void*) fd;
+	//dprintf("lklfs_create_impl(%s) fd=%d\n", file_path, fd);
 	return 0;
 }
 
